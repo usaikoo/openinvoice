@@ -31,7 +31,7 @@ export default async function Page() {
             </div>
             <nav className='flex items-center gap-4'>
               <a
-                href='https://github.com/usaikoo/openinvoice.store'
+                href='https://github.com/usaikoo/openinvoice.git'
                 target='_blank'
                 rel='noopener noreferrer'
                 className='text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors'
@@ -81,7 +81,7 @@ export default async function Page() {
               </Button>
               <Button asChild size='lg' variant='outline' className='text-base'>
                 <a
-                  href='https://github.com/usaikoo/openinvoice.store'
+                  href='https://github.com/usaikoo/openinvoice.git'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='flex items-center gap-2'
@@ -192,7 +192,7 @@ export default async function Page() {
                 Privacy Policy
               </Link>
               <a
-                href='https://github.com/usaikoo/openinvoice.store'
+                href='https://github.com/usaikoo/openinvoice.git'
                 target='_blank'
                 rel='noopener noreferrer'
                 className='hover:text-foreground transition-colors'
