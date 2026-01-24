@@ -7,10 +7,10 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { IconTrash } from '@tabler/icons-react';
+import { IconTrash, IconDownload } from '@tabler/icons-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { formatDate, formatCurrency } from '@/lib/format';
@@ -46,7 +46,9 @@ export function PaymentsList({ invoiceId }: { invoiceId: string }) {
   }
 
   if (!payments || payments.length === 0) {
-    return <p className='text-sm text-muted-foreground'>No payments recorded</p>;
+    return (
+      <p className='text-muted-foreground text-sm'>No payments recorded</p>
+    );
   }
 
   return (
@@ -66,16 +68,31 @@ export function PaymentsList({ invoiceId }: { invoiceId: string }) {
             {payments.map((payment) => (
               <TableRow key={payment.id}>
                 <TableCell>{formatDate(payment.date)}</TableCell>
-                <TableCell className='font-medium'>{formatCurrency(payment.amount)}</TableCell>
+                <TableCell className='font-medium'>
+                  {formatCurrency(payment.amount)}
+                </TableCell>
                 <TableCell>{payment.method}</TableCell>
                 <TableCell>{payment.notes || '-'}</TableCell>
                 <TableCell className='text-right'>
                   <Button
                     variant='ghost'
                     size='sm'
+                    className='mr-1'
+                    onClick={() =>
+                      window.open(
+                        `/api/payments/${payment.id}/receipt`,
+                        '_blank'
+                      )
+                    }
+                  >
+                    <IconDownload className='h-4 w-4' />
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='sm'
                     onClick={() => setDeleteId(payment.id)}
                   >
-                    <IconTrash className='h-4 w-4 text-destructive' />
+                    <IconTrash className='text-destructive h-4 w-4' />
                   </Button>
                 </TableCell>
               </TableRow>
@@ -84,12 +101,16 @@ export function PaymentsList({ invoiceId }: { invoiceId: string }) {
         </Table>
       </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the payment.
+              This action cannot be undone. This will permanently delete the
+              payment.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -101,4 +122,3 @@ export function PaymentsList({ invoiceId }: { invoiceId: string }) {
     </>
   );
 }
-

@@ -229,6 +229,7 @@ async function handleAccountUpdate(account: Stripe.Account) {
   });
 
   if (organization) {
+    const org = organization as any;
     const isComplete = account.details_submitted && account.charges_enabled;
     const status = isComplete
       ? 'active'
@@ -236,13 +237,24 @@ async function handleAccountUpdate(account: Stripe.Account) {
         ? 'pending'
         : 'incomplete';
 
+    // Preserve manual disconnects:
+    // - stripeOnboardingComplete tracks if the account has EVER been fully complete
+    // - stripeConnectEnabled is whether the org currently allows Stripe payments
+    const wasEverComplete = org.stripeOnboardingComplete;
+    const currentlyEnabled = org.stripeConnectEnabled;
+
+    // Only auto-enable the first time the account becomes complete.
+    // If the user has manually disconnected (enabled === false after completion),
+    // do not turn it back on automatically on future updates.
+    const shouldEnable = isComplete && (currentlyEnabled || !wasEverComplete);
+
     await prisma.organization.update({
       where: { id: organization.id },
       data: {
         stripeAccountStatus: status,
-        stripeConnectEnabled: isComplete,
-        stripeOnboardingComplete: isComplete,
-        stripeAccountEmail: account.email || organization.stripeAccountEmail
+        stripeConnectEnabled: shouldEnable,
+        stripeOnboardingComplete: wasEverComplete || isComplete,
+        stripeAccountEmail: account.email || org.stripeAccountEmail
       }
     });
   }

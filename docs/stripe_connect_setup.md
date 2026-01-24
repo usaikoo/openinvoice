@@ -117,9 +117,10 @@ This will charge 2.9% of each payment as a platform fee.
 
 ### Stripe Connect
 
-- `GET /api/stripe/connect/authorize` - Initiate OAuth connection
-- `GET /api/stripe/connect/status` - Check connection status
-- `POST /api/stripe/connect/disconnect` - Disconnect Stripe account
+- `GET /api/stripe/connect/authorize` - Initiate or update Stripe Connect onboarding for the organization's account
+- `GET /api/stripe/connect/status` - Check connection status and latest Stripe account state
+- `POST /api/stripe/connect/disconnect` - Soft disconnect (disable Stripe payments in the app but keep the Stripe account)
+- `POST /api/stripe/connect/reset` - Hard reset (delete the connected Stripe account and clear all Stripe fields; requires full onboarding again)
 
 ### Payment Processing
 
