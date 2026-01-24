@@ -113,8 +113,10 @@ export async function POST(request: NextRequest) {
 
     const platformFee = calculatePlatformFee(amountInCents);
 
-    // Create or retrieve Stripe customer on the platform account
-    // For Stripe Connect, customers can be created on the platform account
+    // Create or retrieve Stripe customer on the platform account.
+    // For Stripe Connect, customers can be created on the platform account.
+    // We always attach a customer so that Stripe can store and reuse payment
+    // methods (saved cards) for this email across future payments.
     let customerId = invoice.customer.email
       ? await getOrCreateStripeCustomerOnPlatform(
           invoice.customer.email,
@@ -136,6 +138,15 @@ export async function POST(request: NextRequest) {
         customerId: invoice.customerId
       },
       description: `Payment for Invoice #${invoice.invoiceNo}`,
+      // Use Stripe's automatic payment methods so the Payment Element can offer
+      // multiple options (cards, wallets, bank debits) that are enabled on the
+      // connected account.
+      automatic_payment_methods: {
+        enabled: true
+      },
+      // Ask Stripe to save the payment method for future off-session use.
+      // This enables "saved cards" in the Payment Element for this customer.
+      setup_future_usage: 'off_session',
       // Use on_behalf_of to specify the connected account
       on_behalf_of: org.stripeAccountId,
       // Transfer funds to the connected account

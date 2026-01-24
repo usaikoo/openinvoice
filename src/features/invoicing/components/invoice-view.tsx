@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useInvoice } from '../hooks/use-invoices';
 import { formatDate, formatCurrency } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
@@ -30,17 +30,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger
-} from '@/components/ui/drawer';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-500',
@@ -50,16 +39,17 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-gray-400'
 };
 
+type InvoiceSection = 'details' | 'payments' | 'emails' | 'notes';
+
 export function InvoiceView() {
   const params = useParams();
   const id = params?.id as string;
-  const router = useRouter();
   const invoiceQuery = useInvoice(id);
   const { data: invoice, isLoading } = invoiceQuery;
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showStripePayment, setShowStripePayment] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [activeSection, setActiveSection] = useState<InvoiceSection>('details');
 
   // Check Stripe Connect status
   const { data: stripeStatus } = useQuery({
@@ -160,200 +150,285 @@ export function InvoiceView() {
   const balance = total - totalPaid;
 
   return (
-    <div className='relative'>
-      <div className='space-y-6 pr-20'>
-        <div className='flex items-center justify-between'>
-          <div>
-            <h2 className='text-2xl font-bold'>Invoice #{invoice.invoiceNo}</h2>
-            <Badge
-              className={`mt-2 ${statusColors[invoice.status] || 'bg-gray-500'}`}
-            >
-              {invoice.status}
-            </Badge>
-          </div>
-          <div className='flex gap-2'>
-            {balance > 0 &&
-              stripeStatus?.connected &&
-              stripeStatus?.status === 'active' && (
-                <Button
-                  variant='default'
-                  onClick={() => setShowStripePayment(true)}
-                  className='bg-green-600 hover:bg-green-700'
-                >
-                  <IconCurrencyDollar className='mr-2 h-4 w-4' />
-                  Pay Now
-                </Button>
-              )}
-            {invoice.customer?.email && (
+    <div className='space-y-6'>
+      {/* Header */}
+      <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+        <div>
+          <h2 className='text-2xl font-bold'>Invoice #{invoice.invoiceNo}</h2>
+          <Badge
+            className={`mt-2 ${statusColors[invoice.status] || 'bg-gray-500'}`}
+          >
+            {invoice.status}
+          </Badge>
+        </div>
+        <div className='flex flex-wrap gap-2'>
+          {balance > 0 &&
+            stripeStatus?.connected &&
+            stripeStatus?.status === 'active' && (
               <Button
                 variant='default'
-                onClick={handleSendEmail}
-                disabled={isSendingEmail}
+                onClick={() => setShowStripePayment(true)}
+                className='bg-green-600 hover:bg-green-700'
               >
-                <IconMail className='mr-2 h-4 w-4' />
-                {isSendingEmail ? 'Sending...' : 'Send Email'}
+                <IconCurrencyDollar className='mr-2 h-4 w-4' />
+                Pay Now
               </Button>
             )}
+          {invoice.customer?.email && (
             <Button
-              variant='outline'
-              onClick={handleShareLink}
-              disabled={isGeneratingLink}
+              variant='default'
+              onClick={handleSendEmail}
+              disabled={isSendingEmail}
             >
-              <IconLink className='mr-2 h-4 w-4' />
-              {isGeneratingLink ? 'Generating...' : 'Share Link'}
+              <IconMail className='mr-2 h-4 w-4' />
+              {isSendingEmail ? 'Sending...' : 'Send Email'}
             </Button>
-            <Button variant='outline' onClick={handleDownloadPDF}>
-              <IconDownload className='mr-2 h-4 w-4' /> Download PDF
-            </Button>
-            <Button variant='outline' asChild>
-              <Link href={`/dashboard/invoices/${id}/edit`}>
-                <IconEdit className='mr-2 h-4 w-4' /> Edit
-              </Link>
-            </Button>
-          </div>
+          )}
+          <Button
+            variant='outline'
+            onClick={handleShareLink}
+            disabled={isGeneratingLink}
+          >
+            <IconLink className='mr-2 h-4 w-4' />
+            {isGeneratingLink ? 'Generating...' : 'Share Link'}
+          </Button>
+          <Button variant='outline' onClick={handleDownloadPDF}>
+            <IconDownload className='mr-2 h-4 w-4' /> Download PDF
+          </Button>
+          <Button variant='outline' asChild>
+            <Link href={`/dashboard/invoices/${id}/edit`}>
+              <IconEdit className='mr-2 h-4 w-4' /> Edit
+            </Link>
+          </Button>
         </div>
-
-        <div className='grid grid-cols-2 gap-4'>
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className='font-semibold'>{invoice.customer?.name}</p>
-              {invoice.customer?.email && (
-                <p className='text-muted-foreground text-sm'>
-                  {invoice.customer.email}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoice Details</CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-1'>
-              <div className='flex justify-between'>
-                <span className='text-muted-foreground'>Issue Date:</span>
-                <span>{formatDate(invoice.issueDate)}</span>
-              </div>
-              <div className='flex justify-between'>
-                <span className='text-muted-foreground'>Due Date:</span>
-                <span>{formatDate(invoice.dueDate)}</span>
-              </div>
-              {invoice.emailSentCount !== undefined &&
-                invoice.emailSentCount > 0 && (
-                  <div className='mt-2 flex justify-between border-t pt-2'>
-                    <span className='text-muted-foreground'>Emails Sent:</span>
-                    <span className='font-semibold'>
-                      {invoice.emailSentCount}
-                    </span>
-                  </div>
-                )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='rounded-md border'>
-              <table className='w-full'>
-                <thead>
-                  <tr className='border-b'>
-                    <th className='p-2 text-left'>Description</th>
-                    <th className='p-2 text-right'>Quantity</th>
-                    <th className='p-2 text-right'>Price</th>
-                    <th className='p-2 text-right'>Tax</th>
-                    <th className='p-2 text-right'>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoice.items.map((item) => {
-                    const itemSubtotal = item.price * item.quantity;
-                    const itemTax = itemSubtotal * (item.taxRate / 100);
-                    const itemTotal = itemSubtotal + itemTax;
-                    return (
-                      <tr key={item.id} className='border-b'>
-                        <td className='p-2'>{item.description}</td>
-                        <td className='p-2 text-right'>{item.quantity}</td>
-                        <td className='p-2 text-right'>
-                          {formatCurrency(item.price)}
-                        </td>
-                        <td className='p-2 text-right'>{item.taxRate}%</td>
-                        <td className='p-2 text-right'>
-                          {formatCurrency(itemTotal)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className='mt-4 ml-auto w-64 space-y-2'>
-              <div className='flex justify-between'>
-                <span>Subtotal:</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              <div className='flex justify-between'>
-                <span>Tax:</span>
-                <span>{formatCurrency(tax)}</span>
-              </div>
-              <div className='flex justify-between border-t pt-2 text-lg font-bold'>
-                <span>Total:</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
-              {totalPaid > 0 && (
-                <>
-                  <div className='flex justify-between text-green-600'>
-                    <span>Paid:</span>
-                    <span>{formatCurrency(totalPaid)}</span>
-                  </div>
-                  <div className='flex justify-between border-t pt-2 font-bold'>
-                    <span>Balance:</span>
-                    <span>{formatCurrency(balance)}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Right Sidebar Navigation */}
-      <div className='fixed top-1/2 right-4 z-40 flex -translate-y-1/2 flex-col gap-3'>
-        {/* Email History Drawer */}
-        <Drawer direction='right'>
-          <DrawerTrigger asChild>
+      {/* Main layout: left section nav + right content */}
+      <div className='mt-2 grid gap-6 md:grid-cols-12'>
+        {/* Section navigation */}
+        <div className='flex h-full flex-col p-3 md:col-span-3'>
+          <div className='text-muted-foreground mb-2 px-1 text-xs font-semibold tracking-wide uppercase'>
+            Sections
+          </div>
+          <div className='flex flex-col gap-1'>
             <Button
-              variant='outline'
-              size='icon'
-              className='relative h-12 w-12 rounded-full shadow-lg'
-              title='Email History'
+              variant={activeSection === 'details' ? 'default' : 'ghost'}
+              size='sm'
+              className='justify-start gap-2'
+              onClick={() => setActiveSection('details')}
             >
-              <IconMail className='h-5 w-5' />
+              <IconNotes className='h-4 w-4' />
+              Details
+            </Button>
+            <Button
+              variant={activeSection === 'payments' ? 'default' : 'ghost'}
+              size='sm'
+              className='justify-start gap-2'
+              onClick={() => setActiveSection('payments')}
+            >
+              <IconCurrencyDollar className='h-4 w-4' />
+              Payments
+              {invoice.payments.length > 0 && (
+                <span className='ml-auto rounded-full bg-emerald-100 px-2 text-xs font-medium text-emerald-700'>
+                  {invoice.payments.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant={activeSection === 'emails' ? 'default' : 'ghost'}
+              size='sm'
+              className='justify-start gap-2'
+              onClick={() => setActiveSection('emails')}
+            >
+              <IconMail className='h-4 w-4' />
+              Emails
               {emailLogs.length > 0 && (
-                <span className='absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white'>
+                <span className='ml-auto rounded-full bg-blue-100 px-2 text-xs font-medium text-blue-700'>
                   {emailLogs.length}
                 </span>
               )}
             </Button>
-          </DrawerTrigger>
-          <DrawerContent className='flex h-[calc(100vh-2rem)] max-w-md flex-col'>
-            <DrawerHeader>
-              <DrawerTitle>Email History</DrawerTitle>
-              <DrawerDescription>
-                Track all emails sent for this invoice
-              </DrawerDescription>
-            </DrawerHeader>
-            <ScrollArea className='flex-1 overflow-y-auto px-4'>
-              <div className='space-y-4 pb-4'>
+            <Button
+              variant={activeSection === 'notes' ? 'default' : 'ghost'}
+              size='sm'
+              className='justify-start gap-2'
+              onClick={() => setActiveSection('notes')}
+            >
+              <IconNotes className='h-4 w-4' />
+              Notes
+            </Button>
+          </div>
+        </div>
+
+        {/* Section content */}
+        <div className='space-y-6 md:col-span-9'>
+          {activeSection === 'details' && (
+            <>
+              <div className='grid gap-4 md:grid-cols-2'>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Customer Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className='font-semibold'>{invoice.customer?.name}</p>
+                    {invoice.customer?.email && (
+                      <p className='text-muted-foreground text-sm'>
+                        {invoice.customer.email}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Invoice Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className='space-y-1'>
+                    <div className='flex justify-between'>
+                      <span className='text-muted-foreground'>Issue Date:</span>
+                      <span>{formatDate(invoice.issueDate)}</span>
+                    </div>
+                    <div className='flex justify-between'>
+                      <span className='text-muted-foreground'>Due Date:</span>
+                      <span>{formatDate(invoice.dueDate)}</span>
+                    </div>
+                    {invoice.emailSentCount !== undefined &&
+                      invoice.emailSentCount > 0 && (
+                        <div className='mt-2 flex justify-between border-t pt-2'>
+                          <span className='text-muted-foreground'>
+                            Emails Sent:
+                          </span>
+                          <span className='font-semibold'>
+                            {invoice.emailSentCount}
+                          </span>
+                        </div>
+                      )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className='rounded-md border'>
+                    <table className='w-full'>
+                      <thead>
+                        <tr className='border-b'>
+                          <th className='p-2 text-left'>Description</th>
+                          <th className='p-2 text-right'>Quantity</th>
+                          <th className='p-2 text-right'>Price</th>
+                          <th className='p-2 text-right'>Tax</th>
+                          <th className='p-2 text-right'>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoice.items.map((item) => {
+                          const itemSubtotal = item.price * item.quantity;
+                          const itemTax = itemSubtotal * (item.taxRate / 100);
+                          const itemTotal = itemSubtotal + itemTax;
+                          return (
+                            <tr key={item.id} className='border-b'>
+                              <td className='p-2'>{item.description}</td>
+                              <td className='p-2 text-right'>
+                                {item.quantity}
+                              </td>
+                              <td className='p-2 text-right'>
+                                {formatCurrency(item.price)}
+                              </td>
+                              <td className='p-2 text-right'>
+                                {item.taxRate}%
+                              </td>
+                              <td className='p-2 text-right'>
+                                {formatCurrency(itemTotal)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className='mt-4 ml-auto w-full max-w-xs space-y-2'>
+                    <div className='flex justify-between'>
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(subtotal)}</span>
+                    </div>
+                    <div className='flex justify-between'>
+                      <span>Tax:</span>
+                      <span>{formatCurrency(tax)}</span>
+                    </div>
+                    <div className='flex justify-between border-t pt-2 text-lg font-bold'>
+                      <span>Total:</span>
+                      <span>{formatCurrency(total)}</span>
+                    </div>
+                    {totalPaid > 0 && (
+                      <>
+                        <div className='flex justify-between text-green-600'>
+                          <span>Paid:</span>
+                          <span>{formatCurrency(totalPaid)}</span>
+                        </div>
+                        <div className='flex justify-between border-t pt-2 font-bold'>
+                          <span>Balance:</span>
+                          <span>{formatCurrency(balance)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {activeSection === 'payments' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Payments & Receipts</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-6'>
+                {balance > 0 && (
+                  <div className='bg-muted/40 mb-2 space-y-4 rounded-md border p-4'>
+                    {stripeStatus?.connected &&
+                    stripeStatus?.status === 'active' ? (
+                      <StripePaymentForm
+                        invoiceId={id}
+                        amount={balance}
+                        onSuccess={() => {
+                          refetchEmailLogs();
+                          invoiceQuery.refetch();
+                          toast.success('Payment processed successfully!');
+                        }}
+                        onCancel={() => undefined}
+                      />
+                    ) : null}
+                    <div className='text-muted-foreground text-sm'>
+                      Or record a manual payment:
+                    </div>
+                    <PaymentForm
+                      invoiceId={id}
+                      maxAmount={balance}
+                      onSuccess={() => {
+                        refetchEmailLogs();
+                        invoiceQuery.refetch();
+                      }}
+                    />
+                  </div>
+                )}
+                <PaymentsList invoiceId={id} />
+              </CardContent>
+            </Card>
+          )}
+
+          {activeSection === 'emails' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Email History</CardTitle>
+              </CardHeader>
+              <CardContent className='space-y-4'>
                 {emailLogs.length === 0 ? (
-                  <p className='text-muted-foreground py-8 text-center text-sm'>
-                    No emails sent yet
+                  <p className='text-muted-foreground py-4 text-sm'>
+                    No emails sent yet for this invoice.
                   </p>
                 ) : (
                   emailLogs.map((log: any) => {
@@ -411,10 +486,9 @@ export function InvoiceView() {
                           )}
                         </div>
 
-                        {/* Email Events Summary */}
                         {events.length > 0 && (
-                          <div className='space-y-2 border-t pt-2'>
-                            <div className='flex flex-wrap gap-2 text-xs'>
+                          <div className='space-y-2 border-t pt-2 text-xs'>
+                            <div className='flex flex-wrap gap-2'>
                               {delivered && (
                                 <Badge
                                   variant='outline'
@@ -449,9 +523,8 @@ export function InvoiceView() {
                               )}
                             </div>
 
-                            {/* Detailed Events */}
                             <details className='mt-2'>
-                              <summary className='text-muted-foreground hover:text-foreground cursor-pointer text-xs'>
+                              <summary className='text-muted-foreground hover:text-foreground cursor-pointer'>
                                 View all events ({events.length})
                               </summary>
                               <div className='mt-2 space-y-1 border-l-2 pl-4'>
@@ -468,8 +541,8 @@ export function InvoiceView() {
                                     if (event.metadata) {
                                       metadata = JSON.parse(event.metadata);
                                     }
-                                  } catch (e) {
-                                    // Ignore parse errors
+                                  } catch {
+                                    // ignore
                                   }
 
                                   return (
@@ -512,115 +585,27 @@ export function InvoiceView() {
                     );
                   })
                 )}
-              </div>
-            </ScrollArea>
-            <DrawerFooter>
-              <DrawerClose asChild>
-                <Button variant='outline'>Close</Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Payment History Drawer */}
-        <Drawer direction='right'>
-          <DrawerTrigger asChild>
-            <Button
-              variant='outline'
-              size='icon'
-              className='relative h-12 w-12 rounded-full shadow-lg'
-              title='Payment History'
-            >
-              <IconCurrencyDollar className='h-5 w-5' />
-              {invoice.payments.length > 0 && (
-                <span className='absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs text-white'>
-                  {invoice.payments.length}
-                </span>
-              )}
-            </Button>
-          </DrawerTrigger>
-          <DrawerContent className='flex h-[calc(100vh-2rem)] max-w-md flex-col'>
-            <DrawerHeader>
-              <DrawerTitle>Payment History</DrawerTitle>
-              <DrawerDescription>
-                All payments recorded for this invoice
-              </DrawerDescription>
-            </DrawerHeader>
-            <ScrollArea className='flex-1 overflow-y-auto px-4'>
-              <div className='pb-4'>
-                {balance > 0 && (
-                  <div className='mb-4 space-y-4'>
-                    {stripeStatus?.connected &&
-                    stripeStatus?.status === 'active' ? (
-                      <StripePaymentForm
-                        invoiceId={id}
-                        amount={balance}
-                        onSuccess={() => {
-                          setShowPaymentForm(false);
-                          refetchEmailLogs();
-                          invoiceQuery.refetch();
-                        }}
-                        onCancel={() => setShowPaymentForm(false)}
-                      />
-                    ) : null}
-                    <div className='text-muted-foreground text-sm'>
-                      Or record a manual payment:
-                    </div>
-                    <PaymentForm
-                      invoiceId={id}
-                      maxAmount={balance}
-                      onSuccess={() => {
-                        setShowPaymentForm(false);
-                        refetchEmailLogs();
-                        invoiceQuery.refetch();
-                      }}
-                    />
-                  </div>
-                )}
-                <PaymentsList invoiceId={id} />
-              </div>
-            </ScrollArea>
-            <DrawerFooter>
-              <DrawerClose asChild>
-                <Button variant='outline'>Close</Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-
-        {/* Notes Drawer */}
-        {invoice.notes && (
-          <Drawer direction='right'>
-            <DrawerTrigger asChild>
-              <Button
-                variant='outline'
-                size='icon'
-                className='h-12 w-12 rounded-full shadow-lg'
-                title='Notes'
-              >
-                <IconNotes className='h-5 w-5' />
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent className='flex h-[calc(100vh-2rem)] max-w-md flex-col'>
-              <DrawerHeader>
-                <DrawerTitle>Invoice Notes</DrawerTitle>
-                <DrawerDescription>
-                  Additional information about this invoice
-                </DrawerDescription>
-              </DrawerHeader>
-              <ScrollArea className='flex-1 overflow-y-auto px-4'>
-                <div className='pb-4'>
+          {activeSection === 'notes' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {invoice.notes ? (
                   <p className='text-sm whitespace-pre-wrap'>{invoice.notes}</p>
-                </div>
-              </ScrollArea>
-              <DrawerFooter>
-                <DrawerClose asChild>
-                  <Button variant='outline'>Close</Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-        )}
+                ) : (
+                  <p className='text-muted-foreground text-sm'>
+                    No notes have been added for this invoice yet.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
 
       {/* Stripe Payment Dialog */}
