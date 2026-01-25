@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useProducts } from '../hooks/use-products';
+import { useProducts, type Product } from '../hooks/use-products';
 import { DataTable } from '@/components/ui/table/data-table';
 import { DataTableToolbar } from '@/components/ui/table/data-table-toolbar';
 import { productColumns } from './product-tables/product-columns';
@@ -14,8 +14,10 @@ import {
   type ColumnFiltersState,
   type SortingState
 } from '@tanstack/react-table';
+import { useRouter } from 'next/navigation';
 
 export function ProductsList() {
+  const router = useRouter();
   const { data: products = [], isLoading, error } = useProducts();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -53,9 +55,13 @@ export function ProductsList() {
     );
   }
 
+  const handleRowClick = (product: Product) => {
+    router.push(`/dashboard/products/${product.id}/edit`);
+  };
+
   return (
     <div className='h-[calc(100vh-250px)] min-h-[400px] w-full'>
-      <DataTable table={table}>
+      <DataTable table={table} onRowClick={handleRowClick}>
         <DataTableToolbar table={table} />
       </DataTable>
     </div>

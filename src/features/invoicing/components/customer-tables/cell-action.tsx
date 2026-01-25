@@ -55,7 +55,7 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
       />
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant='ghost' className='h-8 w-8 p-0'>
+          <Button variant='ghost' className='h-8 w-8 p-0' data-no-row-click>
             <span className='sr-only'>Open menu</span>
             <IconDotsVertical className='h-4 w-4' />
           </Button>

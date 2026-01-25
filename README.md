@@ -270,7 +270,7 @@ For detailed setup instructions, see:
   - [x] Right sidebar navigation for email/payment/notes history
   - [x] Email status badges and detailed event logs
 
-### Phase 2: Enhanced Payment Features (Q2 2026)
+### Phase 2: Enhanced Payment Features (Q2 2026) ✅ Completed
 
 - [x] **Payment Methods Expansion** ✅
   - [x] Support for multiple payment methods (cards, ACH, bank transfers via automatic_payment_methods) ✅
@@ -299,19 +299,6 @@ For detailed setup instructions, see:
     - [x] UI to manage payment method preferences in customer edit page ✅
     - [x] Display saved payment methods with card details ✅
     - [x] Set/remove default payment method ✅
-- [ ] **Crypto Payment Integration**
-  - [ ] Research and select crypto payment provider (Coinbase Commerce, BitPay, etc.)
-  - [ ] Set up crypto payment API integration
-  - [ ] Implement crypto payment form component
-  - [ ] Add crypto payment option to invoice payment page
-  - [ ] Support for multiple cryptocurrencies (Bitcoin, Ethereum, USDC, etc.)
-  - [ ] Real-time exchange rate conversion
-  - [ ] Crypto payment webhook handling for status updates
-  - [ ] Automatic invoice status updates on crypto payment confirmation
-  - [ ] Crypto payment history and tracking
-  - [ ] Payment confirmation emails for crypto transactions
-  - [ ] Crypto wallet address generation and management
-  - [ ] Transaction verification and blockchain confirmation tracking
 
 ### Phase 3: Multi-Provider Support (Q3 2026) - Optional
 
@@ -362,6 +349,22 @@ For detailed setup instructions, see:
   - [ ] Export capabilities (CSV, Excel, PDF)
   - [ ] Financial forecasting
   - [ ] Customer lifetime value analysis
+
+### Phase 5: Crypto Payment Integration (Final Phase)
+
+- [ ] **Crypto Payment Integration**
+  - [ ] Research and select crypto payment provider (Coinbase Commerce, BitPay, etc.)
+  - [ ] Set up crypto payment API integration
+  - [ ] Implement crypto payment form component
+  - [ ] Add crypto payment option to invoice payment page
+  - [ ] Support for multiple cryptocurrencies (Bitcoin, Ethereum, USDC, etc.)
+  - [ ] Real-time exchange rate conversion
+  - [ ] Crypto payment webhook handling for status updates
+  - [ ] Automatic invoice status updates on crypto payment confirmation
+  - [ ] Crypto payment history and tracking
+  - [ ] Payment confirmation emails for crypto transactions
+  - [ ] Crypto wallet address generation and management
+  - [ ] Transaction verification and blockchain confirmation tracking
 
 ## Scripts
 
