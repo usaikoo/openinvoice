@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useCustomers } from '../hooks/use-customers';
+import { useCustomers, type Customer } from '../hooks/use-customers';
 import { DataTable } from '@/components/ui/table/data-table';
 import { DataTableToolbar } from '@/components/ui/table/data-table-toolbar';
 import { customerColumns } from './customer-tables/customer-columns';
@@ -14,8 +14,10 @@ import {
   type ColumnFiltersState,
   type SortingState
 } from '@tanstack/react-table';
+import { useRouter } from 'next/navigation';
 
 export function CustomersList() {
+  const router = useRouter();
   const { data: customers = [], isLoading, error } = useCustomers();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -53,9 +55,13 @@ export function CustomersList() {
     );
   }
 
+  const handleRowClick = (customer: Customer) => {
+    router.push(`/dashboard/customers/${customer.id}`);
+  };
+
   return (
     <div className='h-[calc(100vh-250px)] min-h-[400px] w-full'>
-      <DataTable table={table}>
+      <DataTable table={table} onRowClick={handleRowClick}>
         <DataTableToolbar table={table} />
       </DataTable>
     </div>
