@@ -15,6 +15,7 @@ Built with modern web technologies and best practices, Open Invoice provides a p
 ### Key Features
 
 - 📝 **Invoice Management** - Create, edit, and manage invoices with a beautiful, user-friendly interface
+- 🔄 **Recurring Invoices & Subscriptions** - Create recurring invoice templates with automated generation, subscription management, and flexible scheduling
 - 👥 **Customer Management** - Keep track of all your customers with detailed contact information
 - 📦 **Product Catalog** - Manage your products and services with pricing and tax information
 - 💰 **Payment Tracking** - Record and track payments against invoices
@@ -166,6 +167,20 @@ For detailed setup instructions, see:
 - Share invoices via secure, shareable links
 - Modern invoice details page with left-side section navigation (Details, Payments, Emails, Notes)
 
+### Recurring Invoices & Subscriptions
+
+- Create recurring invoice templates with flexible scheduling (daily, weekly, monthly, quarterly, yearly, custom)
+- Automated invoice generation via cron job
+- Subscription management with pause/resume/cancel functionality
+- Template-based invoice creation with reusable items
+- Automatic email sending for generated invoices
+- Next generation date tracking
+- View all invoices generated from a template
+- Statistics dashboard showing revenue, payments, and invoice counts
+- Manual invoice generation on demand
+- End date support for time-limited subscriptions
+- Custom interval support for flexible billing cycles
+
 ### Customer Management
 
 - Store customer contact information
@@ -313,10 +328,10 @@ For detailed setup instructions, see:
 
 ### Phase 4: Advanced Features (Q4 2026)
 
-- [ ] **Recurring Invoices & Subscriptions**
-  - [ ] Recurring invoice templates
-  - [ ] Automated invoice generation
-  - [ ] Subscription management
+- [x] **Recurring Invoices & Subscriptions** ✅
+  - [x] Recurring invoice templates ✅
+  - [x] Automated invoice generation ✅
+  - [x] Subscription management ✅
   - [ ] Usage-based billing
 - [x] **Automation & Notifications** ✅
   - [x] Payment reminders and automated follow-ups ✅
@@ -386,6 +401,7 @@ The application uses PostgreSQL with Prisma ORM. Key models include:
 - **Payment** - Payment records linked to invoices and installments
 - **PaymentPlan** - Payment plan configuration (frequency, installment count)
 - **Installment** - Individual payment installments with due dates and amounts
+- **RecurringInvoiceTemplate** - Recurring invoice templates with scheduling and automation
 - **EmailLog** - Email tracking and audit trail
 - **EmailEvent** - Individual email events (opens, clicks, bounces, etc.)
 

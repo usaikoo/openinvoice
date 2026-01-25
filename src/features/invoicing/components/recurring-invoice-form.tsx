@@ -58,15 +58,15 @@ const recurringInvoiceSchema = z.object({
     'yearly',
     'custom'
   ]),
-  interval: z.number().min(1).default(1),
+  interval: z.number().min(1),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().optional().nullable(),
   templateItems: z
     .array(recurringInvoiceItemSchema)
     .min(1, 'At least one item is required'),
   templateNotes: z.string().optional(),
-  daysUntilDue: z.number().min(1).default(30),
-  autoSendEmail: z.boolean().default(true)
+  daysUntilDue: z.number().min(1),
+  autoSendEmail: z.boolean()
 });
 
 type RecurringInvoiceFormData = z.infer<typeof recurringInvoiceSchema>;
