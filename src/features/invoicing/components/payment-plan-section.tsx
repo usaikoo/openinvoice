@@ -143,7 +143,7 @@ export function PaymentPlanSection({
                 </DialogDescription>
               </DialogHeader>
               <Form
-                {...form}
+                form={form}
                 onSubmit={form.handleSubmit(onSubmit)}
                 className='space-y-4'
               >
