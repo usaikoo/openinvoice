@@ -54,6 +54,12 @@ export const navItems: NavItem[] = [
         shortcut: ['i', 'i']
       },
       {
+        title: 'Recurring Invoices',
+        url: '/dashboard/recurring-invoices',
+        icon: 'invoices',
+        shortcut: ['r', 'r']
+      },
+      {
         title: 'Customers',
         url: '/dashboard/customers',
         icon: 'customers',

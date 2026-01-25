@@ -21,6 +21,7 @@ model Customer {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   invoices       Invoice[]
+  recurringInvoiceTemplates RecurringInvoiceTemplate[]
 
   // Payment method preferences
   stripeCustomerId        String?  // Stripe Customer ID (cus_xxx) for payment method storage
@@ -71,10 +72,15 @@ model Invoice {
   reminderCount      Int         @default(0)  // Number of reminders sent
   markedOverdueAt    DateTime?  // When invoice was marked as overdue
 
+  // Recurring invoice tracking
+  recurringInvoiceTemplate   RecurringInvoiceTemplate? @relation(fields: [recurringTemplateId], references: [id], onDelete: SetNull)
+  recurringTemplateId        String?
+
   @@unique([organizationId, invoiceNo])
   @@index([organizationId, createdAt])
   @@index([status, dueDate])  // For finding overdue invoices
   @@index([organizationId, status, dueDate])  // For reminder queries
+  @@index([recurringTemplateId])
   @@map("invoices")
 }
 
@@ -152,6 +158,7 @@ model Organization {
   products       Product[]
   invoices       Invoice[]
   invoiceCounter InvoiceCounter?
+  recurringInvoiceTemplates RecurringInvoiceTemplate[]
   
   // Stripe Connect fields
   stripeAccountId      String?  @unique  // Connected Stripe account ID (acct_xxx)
@@ -253,5 +260,41 @@ model Installment {
   @@index([paymentPlanId, installmentNumber])
   @@index([status, dueDate]) // For finding overdue installments
   @@map("installments")
+}
+
+model RecurringInvoiceTemplate {
+  id                String       @id @default(cuid())
+  name              String       // Template name (e.g., "Monthly Subscription - Customer X")
+  organizationId   String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerId       String
+  customer          Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  // Recurrence settings
+  frequency         String       // 'daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'custom'
+  interval          Int          @default(1) // For custom frequency (e.g., every 2 months)
+  startDate         DateTime     // When to start generating invoices
+  endDate           DateTime?    // Optional end date (null = never ends)
+  nextGenerationDate DateTime   // Next date when invoice should be generated
+  
+  // Invoice template data (stored as JSON)
+  templateItems     String       // JSON array of invoice items
+  templateNotes     String?      // Notes to include in each invoice
+  daysUntilDue      Int          @default(30) // Days from issue date to due date
+  
+  // Status and tracking
+  status            String       @default("active") // 'active', 'paused', 'cancelled', 'completed'
+  autoSendEmail     Boolean      @default(true) // Automatically send email when invoice is generated
+  totalGenerated    Int          @default(0) // Count of invoices generated
+  lastGeneratedAt   DateTime?    // Last time an invoice was generated
+  
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  invoices          Invoice[]    // Invoices generated from this template
+
+  @@index([organizationId, status])
+  @@index([status, nextGenerationDate]) // For finding templates ready to generate
+  @@index([customerId])
+  @@map("recurring_invoice_templates")
 }
 

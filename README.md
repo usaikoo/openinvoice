@@ -15,6 +15,7 @@ Built with modern web technologies and best practices, Open Invoice provides a p
 ### Key Features
 
 - 📝 **Invoice Management** - Create, edit, and manage invoices with a beautiful, user-friendly interface
+- 🔄 **Recurring Invoices & Subscriptions** - Create recurring invoice templates with automated generation, subscription management, and flexible scheduling
 - 👥 **Customer Management** - Keep track of all your customers with detailed contact information
 - 📦 **Product Catalog** - Manage your products and services with pricing and tax information
 - 💰 **Payment Tracking** - Record and track payments against invoices
@@ -166,6 +167,20 @@ For detailed setup instructions, see:
 - Share invoices via secure, shareable links
 - Modern invoice details page with left-side section navigation (Details, Payments, Emails, Notes)
 
+### Recurring Invoices & Subscriptions
+
+- Create recurring invoice templates with flexible scheduling (daily, weekly, monthly, quarterly, yearly, custom)
+- Automated invoice generation via cron job
+- Subscription management with pause/resume/cancel functionality
+- Template-based invoice creation with reusable items
+- Automatic email sending for generated invoices
+- Next generation date tracking
+- View all invoices generated from a template
+- Statistics dashboard showing revenue, payments, and invoice counts
+- Manual invoice generation on demand
+- End date support for time-limited subscriptions
+- Custom interval support for flexible billing cycles
+
 ### Customer Management
 
 - Store customer contact information
@@ -270,7 +285,7 @@ For detailed setup instructions, see:
   - [x] Right sidebar navigation for email/payment/notes history
   - [x] Email status badges and detailed event logs
 
-### Phase 2: Enhanced Payment Features (Q2 2026)
+### Phase 2: Enhanced Payment Features (Q2 2026) ✅ Completed
 
 - [x] **Payment Methods Expansion** ✅
   - [x] Support for multiple payment methods (cards, ACH, bank transfers via automatic_payment_methods) ✅
@@ -299,19 +314,6 @@ For detailed setup instructions, see:
     - [x] UI to manage payment method preferences in customer edit page ✅
     - [x] Display saved payment methods with card details ✅
     - [x] Set/remove default payment method ✅
-- [ ] **Crypto Payment Integration**
-  - [ ] Research and select crypto payment provider (Coinbase Commerce, BitPay, etc.)
-  - [ ] Set up crypto payment API integration
-  - [ ] Implement crypto payment form component
-  - [ ] Add crypto payment option to invoice payment page
-  - [ ] Support for multiple cryptocurrencies (Bitcoin, Ethereum, USDC, etc.)
-  - [ ] Real-time exchange rate conversion
-  - [ ] Crypto payment webhook handling for status updates
-  - [ ] Automatic invoice status updates on crypto payment confirmation
-  - [ ] Crypto payment history and tracking
-  - [ ] Payment confirmation emails for crypto transactions
-  - [ ] Crypto wallet address generation and management
-  - [ ] Transaction verification and blockchain confirmation tracking
 
 ### Phase 3: Multi-Provider Support (Q3 2026) - Optional
 
@@ -326,10 +328,10 @@ For detailed setup instructions, see:
 
 ### Phase 4: Advanced Features (Q4 2026)
 
-- [ ] **Recurring Invoices & Subscriptions**
-  - [ ] Recurring invoice templates
-  - [ ] Automated invoice generation
-  - [ ] Subscription management
+- [x] **Recurring Invoices & Subscriptions** ✅
+  - [x] Recurring invoice templates ✅
+  - [x] Automated invoice generation ✅
+  - [x] Subscription management ✅
   - [ ] Usage-based billing
 - [x] **Automation & Notifications** ✅
   - [x] Payment reminders and automated follow-ups ✅
@@ -363,6 +365,22 @@ For detailed setup instructions, see:
   - [ ] Financial forecasting
   - [ ] Customer lifetime value analysis
 
+### Phase 5: Crypto Payment Integration (Final Phase)
+
+- [ ] **Crypto Payment Integration**
+  - [ ] Research and select crypto payment provider (Coinbase Commerce, BitPay, etc.)
+  - [ ] Set up crypto payment API integration
+  - [ ] Implement crypto payment form component
+  - [ ] Add crypto payment option to invoice payment page
+  - [ ] Support for multiple cryptocurrencies (Bitcoin, Ethereum, USDC, etc.)
+  - [ ] Real-time exchange rate conversion
+  - [ ] Crypto payment webhook handling for status updates
+  - [ ] Automatic invoice status updates on crypto payment confirmation
+  - [ ] Crypto payment history and tracking
+  - [ ] Payment confirmation emails for crypto transactions
+  - [ ] Crypto wallet address generation and management
+  - [ ] Transaction verification and blockchain confirmation tracking
+
 ## Scripts
 
 - `bun run dev` - Start development server
@@ -383,6 +401,7 @@ The application uses PostgreSQL with Prisma ORM. Key models include:
 - **Payment** - Payment records linked to invoices and installments
 - **PaymentPlan** - Payment plan configuration (frequency, installment count)
 - **Installment** - Individual payment installments with due dates and amounts
+- **RecurringInvoiceTemplate** - Recurring invoice templates with scheduling and automation
 - **EmailLog** - Email tracking and audit trail
 - **EmailEvent** - Individual email events (opens, clicks, bounces, etc.)
 
