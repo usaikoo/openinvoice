@@ -15,6 +15,7 @@ import {
   type SortingState
 } from '@tanstack/react-table';
 import { useRouter } from 'next/navigation';
+import { ExportButton } from '@/components/export-button';
 
 export function ProductsList() {
   const router = useRouter();
@@ -62,7 +63,9 @@ export function ProductsList() {
   return (
     <div className='h-[calc(100vh-250px)] min-h-[400px] w-full'>
       <DataTable table={table} onRowClick={handleRowClick}>
-        <DataTableToolbar table={table} />
+        <DataTableToolbar table={table}>
+          <ExportButton exportType='products' />
+        </DataTableToolbar>
       </DataTable>
     </div>
   );
