@@ -1,52 +1,52 @@
-feat: Complete Stripe Connect payment processing integration
+feat: Add multi-currency support for recurring invoices
 
-This commit implements a full Stripe Connect payment processing system with
-code quality improvements and performance optimizations.
+This commit implements comprehensive currency support for recurring invoices
+and templates, completing the multi-currency feature across the application.
 
-## Stripe Integration Features
-- Stripe Connect Express accounts for multi-tenant payment processing
-- Payment intent creation API with amount validation and balance checking
-- Secure payment form component using Stripe Elements
-- Webhook handler for real-time payment status updates
-- Automatic invoice status updates on successful payment
-- Support for partial payments with validation
-- Payment confirmation email automation
-- Stripe Connect onboarding flow in settings page
-- Platform fee calculation and application
-- Payment error handling and user feedback
+## Recurring Invoice Currency Features
+- Added currency field to RecurringInvoiceTemplate model in database schema
+- Currency selection in recurring invoice form with organization default fallback
+- Currency display in recurring invoice table (amount column with currency code)
+- Currency display in recurring invoice detail view and overview pages
+- Currency support in invoice generation (cron and manual) with template currency
+- All currency formatting uses template currency or organization default
 
-## Code Quality Improvements
-- Updated Stripe API version to latest (2025-12-15.clover)
-- Added proper cleanup and abort controllers in payment form
-- Implemented payment amount validation to prevent overpayment
-- Optimized settings page polling (conditional polling instead of constant)
-- Improved TypeScript types and removed 'any' types where possible
-- Enhanced error handling with proper type checking
-- Fixed idempotency checks in webhook handler
-- Added proper invoice relation handling in webhooks
+## Database Changes
+- Added currency column to recurring_invoice_templates table
+- Migration: 20260126210906_add_currency_to_recurring_invoices
+- Currency field is optional, falls back to organization defaultCurrency
 
-## Performance Optimizations
-- Conditional polling in settings page (only when status is pending)
-- Added AbortController for payment intent creation to prevent memory leaks
-- Payment form now properly waits for PaymentElement to be ready
-- Optimized webhook processing with better error handling
+## UI/UX Improvements
+- Currency dropdown in recurring invoice form with 20+ supported currencies
+- Currency code displayed below amounts in table for clarity
+- Currency field shown in template details section
+- All monetary values formatted with correct currency throughout
 
-## Documentation
-- Updated README with completed Stripe integration roadmap
-- Added Payment Processing section to features overview
-- Updated environment variables documentation
-- Added Stripe Connect setup documentation link
+## API Updates
+- POST /api/recurring-invoices now accepts currency parameter
+- PUT /api/recurring-invoices/[id] supports currency updates
+- Invoice generation routes use template currency when creating invoices
+- Automatic fallback to organization defaultCurrency if template currency not set
+
+## TypeScript Updates
+- Updated RecurringInvoiceTemplate interface to include currency field
+- Updated mutation hooks to support currency parameter
+- Added proper type safety for currency handling
 
 ## Files Changed
-- Added Stripe payment form component
-- Added Stripe API routes (payment-intent, connect/authorize, connect/status, connect/disconnect)
-- Added Stripe webhook handler
-- Added Stripe library utilities
-- Added settings page for Stripe Connect management
-- Updated invoice views with payment functionality
-- Added database migrations for Stripe Connect fields
-- Updated README with roadmap and feature documentation
+- prisma/schema.prisma - Added currency field to RecurringInvoiceTemplate
+- prisma/migrations/ - Added currency migration
+- src/features/invoicing/components/recurring-invoice-form.tsx - Currency selection
+- src/features/invoicing/components/recurring-invoice-tables/columns.tsx - Currency display
+- src/features/invoicing/components/recurring-invoice-view.tsx - Currency in detail view
+- src/app/dashboard/recurring-invoices/[id]/overview/page.tsx - Currency in overview
+- src/app/api/recurring-invoices/route.ts - Currency handling in API
+- src/app/api/recurring-invoices/[id]/route.ts - Currency updates
+- src/app/api/recurring-invoices/[id]/generate/route.ts - Currency in generation
+- src/app/api/cron/generate-recurring/route.ts - Currency in cron generation
+- src/features/invoicing/hooks/use-recurring-invoices.ts - TypeScript types
+- README.md - Updated roadmap to mark multi-currency support as completed
 
-This implementation follows Stripe best practices and includes proper error
-handling, validation, and security measures for production use.
-
+This completes the multi-currency support feature, allowing users to set and
+display currencies for both regular invoices and recurring invoice templates
+with proper fallback handling and consistent formatting throughout the app.
