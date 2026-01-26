@@ -332,7 +332,18 @@ For detailed setup instructions, see:
   - [x] Recurring invoice templates ✅
   - [x] Automated invoice generation ✅
   - [x] Subscription management ✅
-  - [ ] Usage-based billing
+  - [x] Usage-based billing ✅
+    - [x] Enable usage-based billing on templates ✅
+    - [x] Record usage data with period tracking ✅
+    - [x] Automatic invoice calculation from usage ✅
+    - [x] Usage history and management UI ✅
+    - [x] Link usage records to generated invoices ✅
+  - [x] Recurring invoice detail page with left sidebar navigation ✅
+    - [x] Overview section with statistics and template details ✅
+    - [x] Items section with add/edit functionality ✅
+    - [x] Usage section for usage-based templates ✅
+    - [x] Invoices section with generated invoices list and manual generation ✅
+    - [x] Notes section with add/edit functionality ✅
 - [x] **Automation & Notifications** ✅
   - [x] Payment reminders and automated follow-ups ✅
     - [x] Automated cron job for payment reminders (GitHub Actions) ✅

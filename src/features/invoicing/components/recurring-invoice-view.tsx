@@ -7,6 +7,8 @@ import {
   useUpdateRecurringInvoice,
   useGenerateRecurringInvoice
 } from '../hooks/use-recurring-invoices';
+import { UsageRecordForm } from './usage-record-form';
+import { UsageHistory } from './usage-history';
 import {
   Card,
   CardContent,
@@ -290,14 +292,14 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Template Name
               </div>
-              <div className='text-lg font-semibold'>{template.name}</div>
+              <div className='text-sm font-semibold'>{template.name}</div>
             </div>
             <Separator />
             <div>
               <div className='text-muted-foreground text-sm font-medium'>
                 Customer
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {template.customer?.name || 'Unknown'}
               </div>
               {template.customer?.email && (
@@ -323,7 +325,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Frequency
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {frequencyLabels[template.frequency] || template.frequency}
               </div>
             </div>
@@ -332,7 +334,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Next Generation
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {format(new Date(template.nextGenerationDate), 'MMM d, yyyy')}
               </div>
             </div>
@@ -341,7 +343,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Total Generated
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {template.totalGenerated} invoice
                 {template.totalGenerated !== 1 ? 's' : ''}
               </div>
@@ -351,10 +353,38 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Template Amount
               </div>
-              <div className='text-lg font-semibold'>
-                {formatCurrency(total)}
+              <div className='text-sm font-semibold'>
+                {template.isUsageBased ? (
+                  <span className='text-muted-foreground italic'>
+                    Variable (usage-based)
+                  </span>
+                ) : (
+                  formatCurrency(total)
+                )}
               </div>
             </div>
+            {template.isUsageBased && (
+              <>
+                <Separator />
+                <div>
+                  <div className='text-muted-foreground text-sm font-medium'>
+                    Billing Type
+                  </div>
+                  <div className='text-sm'>
+                    <Badge variant='secondary' className='text-xs'>
+                      Usage-Based
+                    </Badge>
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <div className='text-muted-foreground text-sm font-medium'>
+                    Usage Unit
+                  </div>
+                  <div className='text-sm'>{template.usageUnit || 'units'}</div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -368,7 +398,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Start Date
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {format(new Date(template.startDate), 'MMM d, yyyy')}
               </div>
             </div>
@@ -377,7 +407,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 End Date
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {template.endDate
                   ? format(new Date(template.endDate), 'MMM d, yyyy')
                   : 'Never'}
@@ -388,15 +418,18 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Days Until Due
               </div>
-              <div className='text-lg'>{template.daysUntilDue} days</div>
+              <div className='text-sm'>{template.daysUntilDue} days</div>
             </div>
             <Separator />
             <div>
               <div className='text-muted-foreground text-sm font-medium'>
                 Auto Send Email
               </div>
-              <div className='text-lg'>
-                <Badge variant={template.autoSendEmail ? 'default' : 'outline'}>
+              <div className='text-sm'>
+                <Badge
+                  variant={template.autoSendEmail ? 'default' : 'outline'}
+                  className='text-xs'
+                >
                   {template.autoSendEmail ? 'Enabled' : 'Disabled'}
                 </Badge>
               </div>
@@ -408,7 +441,7 @@ export function RecurringInvoiceView() {
                   <div className='text-muted-foreground text-sm font-medium'>
                     Interval
                   </div>
-                  <div className='text-lg'>
+                  <div className='text-sm'>
                     {template.interval}{' '}
                     {template.frequency === 'custom' ? 'days' : 'period(s)'}
                   </div>
@@ -422,7 +455,7 @@ export function RecurringInvoiceView() {
                   <div className='text-muted-foreground text-sm font-medium'>
                     Last Generated
                   </div>
-                  <div className='text-lg'>
+                  <div className='text-sm'>
                     {format(new Date(template.lastGeneratedAt), 'MMM d, yyyy')}
                   </div>
                 </div>
@@ -433,7 +466,7 @@ export function RecurringInvoiceView() {
               <div className='text-muted-foreground text-sm font-medium'>
                 Created
               </div>
-              <div className='text-lg'>
+              <div className='text-sm'>
                 {format(new Date(template.createdAt), 'MMM d, yyyy')}
               </div>
             </div>
@@ -449,14 +482,24 @@ export function RecurringInvoiceView() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className='text-sm'>
             <TableHeader>
               <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead className='text-right'>Price</TableHead>
-                <TableHead className='text-right'>Tax Rate</TableHead>
-                <TableHead className='text-right'>Total</TableHead>
+                <TableHead className='text-muted-foreground font-medium'>
+                  Description
+                </TableHead>
+                <TableHead className='text-muted-foreground font-medium'>
+                  Quantity
+                </TableHead>
+                <TableHead className='text-muted-foreground text-right font-medium'>
+                  Price
+                </TableHead>
+                <TableHead className='text-muted-foreground text-right font-medium'>
+                  Tax Rate
+                </TableHead>
+                <TableHead className='text-muted-foreground text-right font-medium'>
+                  Total
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -481,21 +524,46 @@ export function RecurringInvoiceView() {
               })}
             </TableBody>
           </Table>
-          <div className='mt-4 flex justify-end space-x-4 border-t pt-4'>
+          <div className='mt-4 flex justify-end space-x-4 border-t pt-4 text-sm'>
             <div className='text-right'>
-              <div className='text-muted-foreground text-sm'>
+              <div className='text-muted-foreground'>
                 Subtotal: {formatCurrency(subtotal)}
               </div>
-              <div className='text-muted-foreground text-sm'>
+              <div className='text-muted-foreground'>
                 Tax: {formatCurrency(tax)}
               </div>
-              <div className='text-lg font-semibold'>
+              <div className='font-semibold'>
                 Total: {formatCurrency(total)}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {template.isUsageBased && (
+        <>
+          <Card>
+            <CardHeader>
+              <div className='flex items-center justify-between'>
+                <div>
+                  <CardTitle>Usage Management</CardTitle>
+                  <CardDescription>
+                    Record and view usage data for this billing template
+                  </CardDescription>
+                </div>
+                <UsageRecordForm
+                  templateId={template.id}
+                  usageUnit={template.usageUnit}
+                />
+              </div>
+            </CardHeader>
+          </Card>
+          <UsageHistory
+            templateId={template.id}
+            usageUnit={template.usageUnit}
+          />
+        </>
+      )}
 
       {template.templateNotes && (
         <Card>
@@ -542,16 +610,30 @@ export function RecurringInvoiceView() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table className='text-sm'>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Issue Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead className='text-right'>Amount</TableHead>
-                  <TableHead className='text-right'>Paid</TableHead>
-                  <TableHead className='text-right'>Actions</TableHead>
+                  <TableHead className='text-muted-foreground font-medium'>
+                    Invoice #
+                  </TableHead>
+                  <TableHead className='text-muted-foreground font-medium'>
+                    Status
+                  </TableHead>
+                  <TableHead className='text-muted-foreground font-medium'>
+                    Issue Date
+                  </TableHead>
+                  <TableHead className='text-muted-foreground font-medium'>
+                    Due Date
+                  </TableHead>
+                  <TableHead className='text-muted-foreground text-right font-medium'>
+                    Amount
+                  </TableHead>
+                  <TableHead className='text-muted-foreground text-right font-medium'>
+                    Paid
+                  </TableHead>
+                  <TableHead className='text-muted-foreground text-right font-medium'>
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
