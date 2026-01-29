@@ -30,10 +30,11 @@ import {
   useGenerateRecurringInvoice,
   type RecurringInvoiceTemplate
 } from '../../hooks/use-recurring-invoices';
-import { formatCurrency } from '@/lib/format';
+import { formatDate, formatCurrency } from '@/lib/format';
 import { format } from 'date-fns';
 import { FileText, User, Calendar, DollarSign, Hash } from 'lucide-react';
 import { getInvoiceCurrency } from '@/lib/currency';
+import { calculateItemTotals } from '@/lib/invoice-calculations';
 
 function RecurringInvoiceActions({
   template

@@ -1,9 +1,14 @@
-import { IconFileText, IconChartLine, IconUsers } from '@tabler/icons-react';
+import {
+  IconFileText,
+  IconChartLine,
+  IconUsers,
+  type TablerIcon
+} from '@tabler/icons-react';
 
 export interface ReportsNavItem {
   title: string;
   href: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: TablerIcon;
 }
 
 /**

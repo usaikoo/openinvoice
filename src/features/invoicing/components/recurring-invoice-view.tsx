@@ -63,7 +63,7 @@ export function RecurringInvoiceView() {
   }
 
   const items = JSON.parse(template.templateItems);
-  const { total } = calculateItemTotals(items);
+  const { subtotal, tax, total } = calculateItemTotals(items);
 
   // Get currency from template or organization default
   const currency = getInvoiceCurrency(
