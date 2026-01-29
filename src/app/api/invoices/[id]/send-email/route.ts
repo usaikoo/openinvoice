@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { sendInvoiceEmail } from '@/lib/email';
 import { randomBytes } from 'crypto';
+import { getInvoiceCurrency } from '@/lib/currency';
 
 export async function POST(
   request: NextRequest,
@@ -36,7 +37,8 @@ export async function POST(
             companyPhone: true,
             companyEmail: true,
             companyWebsite: true,
-            footerText: true
+            footerText: true,
+            defaultCurrency: true
           }
         },
         items: {
@@ -44,7 +46,8 @@ export async function POST(
             product: true
           }
         },
-        payments: true
+        payments: true,
+        invoiceTaxes: true
       }
     });
 
@@ -79,11 +82,18 @@ export async function POST(
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const tax = invoice.items.reduce(
+    // Manual tax from item taxRate
+    const manualTax = invoice.items.reduce(
       (sum, item) => sum + item.price * item.quantity * (item.taxRate / 100),
       0
     );
-    const total = subtotal + tax;
+    // Custom tax from invoice taxes (tax profile)
+    const customTax =
+      (invoice as any).invoiceTaxes?.reduce(
+        (sum: number, tax: any) => sum + tax.amount,
+        0
+      ) || 0;
+    const total = subtotal + manualTax + customTax;
 
     // Build URLs
     const baseUrl = request.nextUrl.origin;
@@ -109,6 +119,9 @@ export async function POST(
     let resendId: string | null = null;
 
     try {
+      // Prepare tax breakdown for email
+      const invoiceTaxes = (invoice as any).invoiceTaxes || [];
+
       emailResult = await sendInvoiceEmail({
         to: invoice.customer.email,
         customerName: invoice.customer.name,
@@ -118,6 +131,20 @@ export async function POST(
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         total,
+        subtotal,
+        manualTax,
+        invoiceTaxes: invoiceTaxes.map((tax: any) => ({
+          name: tax.name,
+          rate: tax.rate,
+          amount: tax.amount,
+          authority: tax.authority || undefined
+        })),
+        currency: getInvoiceCurrency(
+          invoice as {
+            currency?: string | null;
+            organization?: { defaultCurrency?: string };
+          }
+        ),
         organizationName: invoice.organization?.name,
         branding: branding
       });
