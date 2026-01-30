@@ -30,10 +30,11 @@ import {
   useGenerateRecurringInvoice,
   type RecurringInvoiceTemplate
 } from '../../hooks/use-recurring-invoices';
-import { formatCurrency } from '@/lib/format';
+import { formatDate, formatCurrency } from '@/lib/format';
 import { format } from 'date-fns';
 import { FileText, User, Calendar, DollarSign, Hash } from 'lucide-react';
 import { getInvoiceCurrency } from '@/lib/currency';
+import { calculateItemTotals } from '@/lib/invoice-calculations';
 
 function RecurringInvoiceActions({
   template
@@ -99,16 +100,8 @@ function RecurringInvoiceActions({
   const calculateTotal = () => {
     try {
       const items = JSON.parse(template.templateItems);
-      const subtotal = items.reduce(
-        (sum: number, item: any) => sum + item.price * item.quantity,
-        0
-      );
-      const tax = items.reduce(
-        (sum: number, item: any) =>
-          sum + item.price * item.quantity * (item.taxRate / 100),
-        0
-      );
-      return subtotal + tax;
+      const { total } = calculateItemTotals(items);
+      return total;
     } catch {
       return 0;
     }
@@ -372,16 +365,8 @@ export const columns: ColumnDef<RecurringInvoiceTemplate>[] = [
     accessorFn: (row) => {
       try {
         const items = JSON.parse(row.templateItems);
-        const subtotal = items.reduce(
-          (sum: number, item: any) => sum + item.price * item.quantity,
-          0
-        );
-        const tax = items.reduce(
-          (sum: number, item: any) =>
-            sum + item.price * item.quantity * (item.taxRate / 100),
-          0
-        );
-        return subtotal + tax;
+        const { total } = calculateItemTotals(items);
+        return total;
       } catch {
         return 0;
       }
@@ -417,16 +402,7 @@ export const columns: ColumnDef<RecurringInvoiceTemplate>[] = [
       }
       try {
         const items = JSON.parse(template.templateItems);
-        const subtotal = items.reduce(
-          (sum: number, item: any) => sum + item.price * item.quantity,
-          0
-        );
-        const tax = items.reduce(
-          (sum: number, item: any) =>
-            sum + item.price * item.quantity * (item.taxRate / 100),
-          0
-        );
-        const total = subtotal + tax;
+        const { total } = calculateItemTotals(items);
         return (
           <div className='text-right'>
             <div className='font-medium'>{formatCurrency(total, currency)}</div>
