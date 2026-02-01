@@ -134,8 +134,13 @@ export function useUpdateInvoice() {
     mutationFn: async ({
       id,
       ...data
-    }: Partial<Invoice> & {
+    }: {
       id: string;
+      customerId?: string;
+      dueDate?: string;
+      issueDate?: string;
+      status?: string;
+      notes?: string | null;
       templateId?: string | null;
       currency?: string;
       taxProfileId?: string;

@@ -286,13 +286,23 @@ export function InvoiceForm() {
             selectedTaxProfileId && selectedTaxProfileId !== 'none'
               ? selectedTaxProfileId
               : undefined,
-          items: data.items.map((item) => ({
-            productId: item.productId,
-            description: item.description,
-            quantity: item.quantity,
-            price: item.price,
-            taxRate: item.taxRate
-          }))
+          items: data.items.map(
+            (
+              item
+            ): {
+              productId: string;
+              description: string;
+              quantity: number;
+              price: number;
+              taxRate?: number;
+            } => ({
+              productId: item.productId,
+              description: item.description,
+              quantity: item.quantity,
+              price: item.price,
+              ...(item.taxRate !== undefined && { taxRate: item.taxRate })
+            })
+          )
         });
 
         toast.success('Invoice updated successfully');
