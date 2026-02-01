@@ -535,6 +535,7 @@ async function sendReminderForInvoice(
       daysUntilDue,
       daysOverdue,
       organizationName: invoice.organization?.name,
+      organizationId: invoice.organizationId,
       reminderType
     });
 
@@ -573,7 +574,8 @@ async function sendReminderForInvoice(
             to: formattedPhone,
             message: smsMessage,
             invoiceId: invoice.id,
-            smsType: 'payment_reminder'
+            smsType: 'payment_reminder',
+            organizationId: invoice.organizationId
           });
 
           // Log the SMS

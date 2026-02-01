@@ -285,7 +285,8 @@ export async function GET(request: NextRequest) {
                 invoice.currency ||
                 template.organization?.defaultCurrency ||
                 'USD',
-              organizationName: template.organization?.name
+              organizationName: template.organization?.name,
+              organizationId: template.organizationId
             });
 
             // Log the email

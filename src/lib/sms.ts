@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { prisma } from './db';
 
 if (!process.env.TWILIO_ACCOUNT_SID) {
   console.warn('TWILIO_ACCOUNT_SID is not set in environment variables');
@@ -7,7 +8,8 @@ if (!process.env.TWILIO_AUTH_TOKEN) {
   console.warn('TWILIO_AUTH_TOKEN is not set in environment variables');
 }
 
-const twilioClient =
+// Default Twilio client from environment variables
+const defaultTwilioClient =
   process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
     ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
     : null;
@@ -17,6 +19,7 @@ export interface SendSMSParams {
   message: string;
   invoiceId?: string;
   smsType?: 'invoice' | 'payment_confirmation' | 'payment_reminder';
+  organizationId?: string; // Optional organization ID to use org-specific settings
 }
 
 export interface SMSResult {
@@ -27,39 +30,91 @@ export interface SMSResult {
 }
 
 /**
- * Get the from phone number
- * Defaults to TWILIO_FROM_NUMBER from environment
+ * Get Twilio configuration from organization settings or environment variables
  */
-function getFromNumber(): string {
-  const fromNumber = process.env.TWILIO_FROM_NUMBER;
-  if (!fromNumber) {
-    throw new Error('TWILIO_FROM_NUMBER is not set in environment variables');
+async function getTwilioConfig(organizationId?: string): Promise<{
+  accountSid: string | null;
+  authToken: string | null;
+  fromNumber: string | null;
+  client: twilio.Twilio | null;
+}> {
+  let accountSid: string | null = null;
+  let authToken: string | null = null;
+  let fromNumber: string | null = null;
+
+  // If organizationId is provided, try to get settings from organization
+  if (organizationId) {
+    try {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: {
+          twilioAccountSid: true,
+          twilioAuthToken: true,
+          twilioFromNumber: true
+        }
+      });
+
+      if (organization) {
+        accountSid = organization.twilioAccountSid || null;
+        authToken = organization.twilioAuthToken || null;
+        fromNumber = organization.twilioFromNumber || null;
+      }
+    } catch (error) {
+      console.error('Error fetching organization Twilio settings:', error);
+      // Fall through to use environment variables
+    }
   }
-  return fromNumber;
+
+  // Fall back to environment variables if not set in organization
+  if (!accountSid) {
+    accountSid = process.env.TWILIO_ACCOUNT_SID || null;
+  }
+  if (!authToken) {
+    authToken = process.env.TWILIO_AUTH_TOKEN || null;
+  }
+  if (!fromNumber) {
+    fromNumber = process.env.TWILIO_FROM_NUMBER || null;
+  }
+
+  // Create Twilio client if credentials are available
+  const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
+
+  return { accountSid, authToken, fromNumber, client };
 }
 
 /**
  * Send an SMS via Twilio
  */
 export async function sendSMS(params: SendSMSParams): Promise<SMSResult> {
-  const { to, message } = params;
+  const { to, message, organizationId } = params;
 
-  if (!twilioClient) {
+  // Get Twilio configuration (organization settings first, then env vars)
+  const config = await getTwilioConfig(organizationId);
+
+  if (!config.client) {
     return {
       success: false,
       twilioSid: null,
       status: null,
       error:
-        'Twilio client not initialized. Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.'
+        'Twilio client not initialized. Check organization settings or TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.'
+    };
+  }
+
+  if (!config.fromNumber) {
+    return {
+      success: false,
+      twilioSid: null,
+      status: null,
+      error:
+        'Twilio from number not configured. Check organization settings or TWILIO_FROM_NUMBER environment variable.'
     };
   }
 
   try {
-    const fromNumber = getFromNumber();
-
-    const twilioMessage = await twilioClient.messages.create({
+    const twilioMessage = await config.client.messages.create({
       body: message,
-      from: fromNumber,
+      from: config.fromNumber,
       to: to
     });
 

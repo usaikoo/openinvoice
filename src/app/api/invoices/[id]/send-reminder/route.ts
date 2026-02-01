@@ -132,6 +132,7 @@ export async function POST(
         daysUntilDue,
         daysOverdue,
         organizationName: invoice.organization?.name,
+        organizationId: orgId,
         reminderType
       });
       resendId = emailResult.id || null;

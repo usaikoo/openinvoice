@@ -146,6 +146,7 @@ export async function POST(
           }
         ),
         organizationName: invoice.organization?.name,
+        organizationId: orgId,
         branding: branding
       });
       resendId = emailResult.id || null;

@@ -3,6 +3,8 @@ import {
   Palette,
   Settings,
   FileText,
+  Mail,
+  MessageSquare,
   LucideIcon
 } from 'lucide-react';
 
@@ -33,5 +35,10 @@ export const settingsNavItems: SettingsNavItem[] = [
     title: 'Templates',
     href: '/dashboard/settings/templates',
     icon: FileText
+  },
+  {
+    title: 'Notifications',
+    href: '/dashboard/settings/notifications',
+    icon: Mail
   }
 ];

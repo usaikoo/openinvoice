@@ -219,7 +219,8 @@ export async function POST(
           issueDate: invoice.issueDate,
           dueDate: invoice.dueDate,
           total,
-          organizationName: template.organization?.name
+          organizationName: template.organization?.name,
+          organizationId: orgId
         });
 
         // Log the email

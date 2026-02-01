@@ -128,7 +128,9 @@ export function ImportDialog({
           {/* File Upload */}
           <FileUploader
             value={file ? [file] : []}
-            onValueChange={(files) => {
+            onValueChange={(value) => {
+              const files =
+                typeof value === 'function' ? value(file ? [file] : []) : value;
               if (files && files.length > 0) {
                 setFile(files[0]);
               } else {

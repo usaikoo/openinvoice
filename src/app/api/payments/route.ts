@@ -156,7 +156,8 @@ export async function POST(request: NextRequest) {
             invoiceUrl,
             amount: payment.amount,
             paymentDate: payment.date,
-            organizationName: payment.invoice.organization?.name
+            organizationName: payment.invoice.organization?.name,
+            organizationId: orgId
           });
           resendId = emailResult.id || null;
         } catch (emailError) {

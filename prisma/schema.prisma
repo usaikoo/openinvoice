@@ -223,6 +223,28 @@ model Organization {
 
   invoiceTemplates InvoiceTemplate[] // Invoice templates
 
+  // Email Configuration
+  emailProvider String? // 'resend' or 'smtp' - which email provider to use
+  
+  // Resend Configuration
+  resendApiKey  String? // Resend API key (if not set, uses RESEND_API_KEY from env)
+  resendFromEmail String? // From email address (if not set, uses RESEND_FROM_EMAIL from env)
+  resendFromName  String? // From name (if not set, uses RESEND_FROM_NAME from env)
+
+  // SMTP Configuration
+  smtpHost String? // SMTP server hostname (e.g., smtp.gmail.com, smtp.sendgrid.net)
+  smtpPort Int? // SMTP server port (e.g., 587, 465, 25)
+  smtpSecure Boolean @default(false) // Use TLS/SSL (true for port 465, false for port 587)
+  smtpUsername String? // SMTP username/email
+  smtpPassword String? // SMTP password or app password
+  smtpFromEmail String? // From email address for SMTP
+  smtpFromName String? // From name for SMTP
+
+  // SMS Configuration (Twilio)
+  twilioAccountSid String? // Twilio Account SID (if not set, uses TWILIO_ACCOUNT_SID from env)
+  twilioAuthToken  String? // Twilio Auth Token (if not set, uses TWILIO_AUTH_TOKEN from env)
+  twilioFromNumber String? // Twilio From Phone Number (if not set, uses TWILIO_FROM_NUMBER from env)
+
   @@map("organizations")
 }
 

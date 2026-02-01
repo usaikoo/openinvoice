@@ -247,7 +247,8 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
         invoiceUrl,
         amount: payment.amount,
         paymentDate: payment.date,
-        organizationName: invoiceWithRelations.organization?.name
+        organizationName: invoiceWithRelations.organization?.name,
+        organizationId: invoiceWithRelations.organizationId
       });
 
       await prisma.emailLog.create({
@@ -299,7 +300,8 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
           to: formattedPhone,
           message: smsMessage,
           invoiceId,
-          smsType: 'payment_confirmation'
+          smsType: 'payment_confirmation',
+          organizationId: invoiceWithRelations.organizationId
         });
 
         await prisma.smsLog.create({

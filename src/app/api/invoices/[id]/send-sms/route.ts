@@ -129,7 +129,8 @@ export async function POST(
         to: formattedPhone,
         message: smsMessage,
         invoiceId: id,
-        smsType: 'invoice'
+        smsType: 'invoice',
+        organizationId: orgId
       });
 
       twilioSid = smsResult.twilioSid;

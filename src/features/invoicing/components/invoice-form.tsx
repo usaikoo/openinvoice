@@ -273,56 +273,39 @@ export function InvoiceForm() {
   const onSubmit = async (data: InvoiceFormData) => {
     try {
       if (isEditing && id) {
-        // For updates, call API directly to include Stripe Tax data
-        const response = await fetch(`/api/invoices/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerId: data.customerId,
-            issueDate: data.issueDate,
-            dueDate: data.dueDate,
-            status: data.status,
-            notes: data.notes,
-            templateId: data.templateId || undefined,
-            currency: data.currency,
-            items: data.items.map((item) => ({
-              productId: item.productId,
-              description: item.description,
-              quantity: item.quantity,
-              price: item.price,
-              taxRate: item.taxRate
-            })),
-            taxProfileId:
-              selectedTaxProfileId && selectedTaxProfileId !== 'none'
-                ? selectedTaxProfileId
-                : undefined
-          })
+        await updateInvoice.mutateAsync({
+          id,
+          customerId: data.customerId,
+          issueDate: data.issueDate,
+          dueDate: data.dueDate,
+          status: data.status,
+          notes: data.notes,
+          templateId: data.templateId || undefined,
+          currency: data.currency,
+          taxProfileId:
+            selectedTaxProfileId && selectedTaxProfileId !== 'none'
+              ? selectedTaxProfileId
+              : undefined,
+          items: data.items.map((item) => ({
+            productId: item.productId,
+            description: item.description,
+            quantity: item.quantity,
+            price: item.price,
+            taxRate: item.taxRate
+          }))
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to update invoice');
-        }
 
         toast.success('Invoice updated successfully');
       } else {
-        // For create, we need to call the API directly with tax data
-        const response = await fetch('/api/invoices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...data,
-            templateId: data.templateId || undefined,
-            currency: data.currency,
-            taxProfileId:
-              selectedTaxProfileId && selectedTaxProfileId !== 'none'
-                ? selectedTaxProfileId
-                : undefined
-          })
+        await createInvoice.mutateAsync({
+          ...data,
+          templateId: data.templateId || undefined,
+          currency: data.currency,
+          taxProfileId:
+            selectedTaxProfileId && selectedTaxProfileId !== 'none'
+              ? selectedTaxProfileId
+              : undefined
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to create invoice');
-        }
 
         toast.success('Invoice created successfully');
       }

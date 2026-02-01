@@ -105,6 +105,7 @@ export function useCreateInvoice() {
       notes?: string;
       templateId?: string | null;
       currency?: string;
+      taxProfileId?: string;
       items: Array<{
         productId: string;
         description: string;
@@ -137,6 +138,7 @@ export function useUpdateInvoice() {
       id: string;
       templateId?: string | null;
       currency?: string;
+      taxProfileId?: string;
       items?: Array<{
         productId: string;
         description: string;
