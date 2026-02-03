@@ -9,13 +9,23 @@ import { isTestMode, isTestnetEnabled } from '@/lib/crypto/blockchain-monitor';
 
 export async function POST(request: NextRequest) {
   try {
-    const { orgId } = await auth();
-
-    if (!orgId) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Organization required' },
-        { status: 401 }
-      );
+    // Get auth, but don't require it (allow guest access via share links)
+    let orgId: string | null = null;
+    try {
+      const authResult = await auth();
+      // Only set orgId if it's a valid non-empty string
+      if (
+        authResult?.orgId &&
+        typeof authResult.orgId === 'string' &&
+        authResult.orgId.length > 0
+      ) {
+        orgId = authResult.orgId;
+      } else {
+        orgId = null;
+      }
+    } catch (error) {
+      // User is not authenticated (guest access) - this is allowed for share links
+      orgId = null;
     }
 
     const body = await request.json();
@@ -28,9 +38,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get invoice
-    const invoice = await prisma.invoice.findFirst({
-      where: { id: invoiceId, organizationId: orgId },
+    // Get invoice - don't filter by orgId yet, we'll check access below
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
       include: {
         items: true,
         payments: true,
@@ -40,8 +50,44 @@ export async function POST(request: NextRequest) {
     });
 
     if (!invoice) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+    }
+
+    // Check access permissions (similar to Stripe endpoints)
+    // Priority: If invoice has shareToken, allow access regardless of auth status
+    const hasShareToken = !!invoice.shareToken;
+    const isAuthenticated =
+      orgId && typeof orgId === 'string' && orgId.length > 0;
+
+    if (hasShareToken) {
+      // Invoice has shareToken - allow access (guest or authenticated)
+      // Use invoice's organizationId
+      orgId = invoice.organizationId;
+    } else if (isAuthenticated) {
+      // Authenticated user accessing invoice without shareToken - must belong to their org
+      if (invoice.organizationId !== orgId) {
+        return NextResponse.json(
+          {
+            error: 'Invoice not found or does not belong to your organization'
+          },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Guest user trying to access invoice without shareToken
       return NextResponse.json(
-        { error: 'Invoice not found or does not belong to your organization' },
+        {
+          error:
+            'This invoice is not publicly accessible. Please use the share link provided in the invoice email.'
+        },
+        { status: 403 }
+      );
+    }
+
+    // Now we have orgId (either from auth or from invoice)
+    if (!orgId) {
+      return NextResponse.json(
+        { error: 'Organization not found' },
         { status: 404 }
       );
     }
