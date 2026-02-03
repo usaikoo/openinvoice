@@ -81,6 +81,7 @@ export function CryptoPaymentForm({
   );
   const [copied, setCopied] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const wsMonitorRef = useRef<ReturnType<
     typeof createXRPWebSocketMonitor
@@ -90,6 +91,26 @@ export function CryptoPaymentForm({
 
   // Storage key for persisting payment data
   const storageKey = `crypto-payment-${invoiceId}`;
+  const sessionStorageKey = `crypto-payment-session-${invoiceId}`;
+
+  // Get or create browser session identifier
+  const getSessionId = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    const sessionKey = 'crypto-payment-session-id';
+    let sessionId = sessionStorage.getItem(sessionKey);
+    if (!sessionId) {
+      // Generate a unique session ID for this browser tab
+      sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem(sessionKey, sessionId);
+    }
+    return sessionId;
+  }, []);
+
+  // Check if QR code is expired (5 minutes)
+  const isQRCodeExpired = useCallback((createdAt: number) => {
+    const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+    return Date.now() - createdAt > fiveMinutes;
+  }, []);
 
   const checkPaymentStatus = useCallback(
     async (
@@ -181,6 +202,7 @@ export function CryptoPaymentForm({
                   wsMonitorRef.current = null;
                 }
                 localStorage.removeItem(storageKey);
+                localStorage.removeItem(sessionStorageKey);
                 toast.success('Payment confirmed!');
                 onSuccess?.();
               }
@@ -207,6 +229,7 @@ export function CryptoPaymentForm({
             wsMonitorRef.current = null;
           }
           localStorage.removeItem(storageKey);
+          localStorage.removeItem(sessionStorageKey);
           toast.success('Payment confirmed!');
           onSuccess?.();
         }
@@ -214,64 +237,84 @@ export function CryptoPaymentForm({
         console.log('Error checking payment status:', error);
       }
     },
-    [invoiceId, storageKey, onSuccess]
+    [invoiceId, storageKey, sessionStorageKey, onSuccess]
   );
 
   // Restore payment data from localStorage on mount
   useEffect(() => {
     const restorePaymentData = async () => {
       try {
-        // Check localStorage for saved payment
+        const currentSessionId = getSessionId();
+        if (!currentSessionId) {
+          setIsRestoring(false);
+          return;
+        }
+
+        // Check localStorage for saved payment with session info
         const savedPaymentId = localStorage.getItem(storageKey);
-        if (savedPaymentId) {
-          // Try to fetch payment data from public API
+        const savedSessionData = localStorage.getItem(sessionStorageKey);
+
+        if (savedPaymentId && savedSessionData) {
           try {
-            const response = await fetch(
-              `/api/invoices/${invoiceId}/crypto-payment?cryptoPaymentId=${savedPaymentId}`
-            );
-            if (response.ok) {
-              const data: CryptoPaymentData = await response.json();
-              setPaymentData(data);
-              // Check status immediately with the fetched data
-              await checkPaymentStatus(data);
-            } else {
-              // Payment might be expired or confirmed, clear storage
+            // Parse session data (contains sessionId and createdAt timestamp)
+            const sessionData = JSON.parse(savedSessionData);
+            const { sessionId, createdAt } = sessionData;
+
+            // Check if this payment belongs to the current browser session
+            if (sessionId !== currentSessionId) {
+              // Different browser session, clear the stored payment
               localStorage.removeItem(storageKey);
+              localStorage.removeItem(sessionStorageKey);
+              setIsRestoring(false);
+              return;
             }
-          } catch (error) {
-            console.log('Error restoring payment data:', error);
-            // Try to get latest pending payment
+
+            // Check if QR code is expired (5 minutes)
+            if (isQRCodeExpired(createdAt)) {
+              // QR code expired, clear storage
+              localStorage.removeItem(storageKey);
+              localStorage.removeItem(sessionStorageKey);
+              setIsRestoring(false);
+              return;
+            }
+
+            // Try to fetch payment data from public API
             try {
               const response = await fetch(
-                `/api/invoices/${invoiceId}/crypto-payment`
+                `/api/invoices/${invoiceId}/crypto-payment?cryptoPaymentId=${savedPaymentId}`
               );
               if (response.ok) {
                 const data: CryptoPaymentData = await response.json();
-                setPaymentData(data);
-                localStorage.setItem(storageKey, data.cryptoPaymentId);
-                await checkPaymentStatus(data);
+                // Also check server-side expiration
+                if (new Date(data.expiresAt) > new Date()) {
+                  setPaymentData(data);
+                  // Check status immediately with the fetched data
+                  await checkPaymentStatus(data);
+                } else {
+                  // Payment expired on server, clear storage
+                  localStorage.removeItem(storageKey);
+                  localStorage.removeItem(sessionStorageKey);
+                }
+              } else {
+                // Payment might be expired or confirmed, clear storage
+                localStorage.removeItem(storageKey);
+                localStorage.removeItem(sessionStorageKey);
               }
-            } catch (err) {
-              console.log('Error fetching latest payment:', err);
-            }
-          }
-        } else {
-          // Try to get latest pending payment for this invoice
-          try {
-            const response = await fetch(
-              `/api/invoices/${invoiceId}/crypto-payment`
-            );
-            if (response.ok) {
-              const data: CryptoPaymentData = await response.json();
-              setPaymentData(data);
-              localStorage.setItem(storageKey, data.cryptoPaymentId);
-              await checkPaymentStatus(data);
+            } catch (error) {
+              console.log('Error restoring payment data:', error);
+              // Clear invalid session data
+              localStorage.removeItem(storageKey);
+              localStorage.removeItem(sessionStorageKey);
             }
           } catch (error) {
-            // No pending payment found, that's okay
-            console.log('No pending payment found');
+            // Invalid session data format, clear it
+            console.log('Error parsing session data:', error);
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem(sessionStorageKey);
           }
         }
+        // Don't fetch latest pending payment automatically - only restore from localStorage
+        // This prevents showing QR codes created by other users
       } catch (error) {
         console.log('Error restoring payment:', error);
       } finally {
@@ -281,21 +324,32 @@ export function CryptoPaymentForm({
 
     restorePaymentData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoiceId]);
+  }, [invoiceId, getSessionId, isQRCodeExpired]);
 
   // Save payment data to localStorage when it changes
   useEffect(() => {
     if (paymentData?.cryptoPaymentId) {
-      localStorage.setItem(storageKey, paymentData.cryptoPaymentId);
+      const sessionId = getSessionId();
+      if (sessionId) {
+        // Save payment ID
+        localStorage.setItem(storageKey, paymentData.cryptoPaymentId);
+        // Save session data with timestamp (for 5-minute expiration check)
+        const sessionData = {
+          sessionId,
+          createdAt: Date.now()
+        };
+        localStorage.setItem(sessionStorageKey, JSON.stringify(sessionData));
+      }
     }
-  }, [paymentData, storageKey]);
+  }, [paymentData, storageKey, sessionStorageKey, getSessionId]);
 
   // Clear localStorage when payment is confirmed
   useEffect(() => {
     if (paymentStatus?.confirmed) {
       localStorage.removeItem(storageKey);
+      localStorage.removeItem(sessionStorageKey);
     }
-  }, [paymentStatus, storageKey]);
+  }, [paymentStatus, storageKey, sessionStorageKey]);
 
   // Generate QR code when payment data is available
   useEffect(() => {
@@ -324,6 +378,55 @@ export function CryptoPaymentForm({
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedText}`;
     setQrCodeDataUrl(qrUrl);
   };
+
+  // Periodically check if QR code has expired and update time remaining
+  useEffect(() => {
+    if (!paymentData) {
+      setTimeRemaining(null);
+      return;
+    }
+
+    const updateTimeRemaining = () => {
+      const savedSessionData = localStorage.getItem(sessionStorageKey);
+      if (savedSessionData) {
+        try {
+          const sessionData = JSON.parse(savedSessionData);
+          const { createdAt } = sessionData;
+
+          // Calculate time remaining (5 minutes = 300000ms)
+          const fiveMinutes = 5 * 60 * 1000;
+          const elapsed = Date.now() - createdAt;
+          const remaining = Math.max(0, fiveMinutes - elapsed);
+
+          // Check if QR code is expired (5 minutes)
+          if (remaining <= 0) {
+            // Clear expired payment data
+            setPaymentData(null);
+            setQrCodeDataUrl('');
+            setPaymentStatus(null);
+            setTimeRemaining(null);
+            localStorage.removeItem(storageKey);
+            localStorage.removeItem(sessionStorageKey);
+            toast.info('QR code has expired. Please create a new payment.');
+            return;
+          }
+
+          // Update time remaining in seconds
+          setTimeRemaining(Math.floor(remaining / 1000));
+        } catch (error) {
+          console.log('Error checking QR code expiration:', error);
+        }
+      }
+    };
+
+    // Update immediately
+    updateTimeRemaining();
+
+    // Then update every second for countdown
+    const interval = setInterval(updateTimeRemaining, 1000);
+
+    return () => clearInterval(interval);
+  }, [paymentData, storageKey, sessionStorageKey, isQRCodeExpired]);
 
   // Use WebSocket for XRP, polling for other cryptos
   useEffect(() => {
@@ -505,8 +608,8 @@ export function CryptoPaymentForm({
 
       const data: CryptoPaymentData = await response.json();
       setPaymentData(data);
-      // Save to localStorage
-      localStorage.setItem(storageKey, data.cryptoPaymentId);
+      // Save to localStorage with session info (will be handled by useEffect)
+      // The useEffect will save both storageKey and sessionStorageKey
 
       // Check status immediately with the new data
       await checkPaymentStatus(data);
@@ -608,12 +711,21 @@ export function CryptoPaymentForm({
             </div>
 
             {qrCodeDataUrl && (
-              <div className='flex justify-center'>
+              <div className='flex flex-col items-center gap-2'>
                 <img
                   src={qrCodeDataUrl}
                   alt='Payment QR Code'
                   className='h-48 w-48 rounded border'
                 />
+                {timeRemaining !== null && timeRemaining > 0 && (
+                  <div className='text-muted-foreground text-xs'>
+                    QR code expires in:{' '}
+                    <span className='font-semibold'>
+                      {Math.floor(timeRemaining / 60)}:
+                      {String(timeRemaining % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
