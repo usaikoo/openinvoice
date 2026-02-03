@@ -94,31 +94,44 @@ export async function POST(
     }
 
     // Check blockchain for transactions
-    const transactions = await checkBlockchainTransactions(
+    const transaction = await checkBlockchainTransactions(
       cryptoPayment.cryptocurrencyCode,
       cryptoPayment.address,
       cryptoPayment.amount,
       cryptoPayment.expiresAt
     );
 
-    if (transactions.length > 0) {
-      // Use provided transaction hash if available, otherwise use first transaction
-      const txHash =
-        providedTxHash || transactions[0].hash || transactions[0].txid;
+    if (transaction) {
+      // Use provided transaction hash if available, otherwise use transaction hash
+      const txHash = providedTxHash || transaction.hash;
 
       // Get transaction details
+      const isTestnet = isTestnetEnabled();
       const txDetails = await getTransactionDetails(
         cryptoPayment.cryptocurrencyCode,
-        txHash
+        txHash,
+        isTestnet
       );
 
-      if (txDetails) {
-        const receivedAmount = parseFloat(txDetails.amount);
+      // Use transaction data if details unavailable
+      const finalTxDetails = txDetails || transaction;
+
+      if (finalTxDetails) {
+        const receivedAmount = parseFloat(finalTxDetails.amount);
         const expectedAmount = parseFloat(cryptoPayment.amount.toString());
 
         // Check if underpaid (allow 1% tolerance for exchange rate fluctuations)
         const tolerance = expectedAmount * 0.01;
         const isUnderpaid = receivedAmount < expectedAmount - tolerance;
+
+        // Calculate fiat amount based on actual received crypto amount
+        const actualFiatAmount = cryptoPayment.exchangeRate
+          ? receivedAmount * cryptoPayment.exchangeRate
+          : cryptoPayment.fiatAmount; // Fallback to original if no exchange rate
+
+        // Check confirmations
+        const confirmations = finalTxDetails.confirmations || 0;
+        const isConfirmed = confirmations >= cryptoPayment.minConfirmations;
 
         if (isUnderpaid) {
           await prisma.cryptoPayment.update({
@@ -126,15 +139,16 @@ export async function POST(
             data: {
               status: 'underpaid',
               transactionHash: txHash,
-              receivedAmount: receivedAmount.toString(),
-              confirmations: txDetails.confirmations || 0
+              amount: receivedAmount.toString(), // Update with actual crypto amount received
+              confirmations,
+              fiatAmount: actualFiatAmount
             }
           });
 
           return NextResponse.json({
             status: 'underpaid',
             confirmed: false,
-            confirmations: txDetails.confirmations || 0,
+            confirmations,
             minConfirmations: cryptoPayment.minConfirmations,
             transactionHash: txHash,
             testMode: isTestMode(),
@@ -142,21 +156,14 @@ export async function POST(
           });
         }
 
-        // Check confirmations
-        const confirmations = txDetails.confirmations || 0;
-        const isConfirmed = confirmations >= cryptoPayment.minConfirmations;
-
         if (isConfirmed) {
-          // Calculate fiat amount based on actual received crypto amount
-          const actualFiatAmount = receivedAmount * cryptoPayment.exchangeRate;
-
           // Update crypto payment
           await prisma.cryptoPayment.update({
             where: { id: cryptoPaymentId },
             data: {
               status: 'confirmed',
               transactionHash: txHash,
-              receivedAmount: receivedAmount.toString(),
+              amount: receivedAmount.toString(), // Update with actual crypto amount received
               confirmations,
               fiatAmount: actualFiatAmount
             }
@@ -186,8 +193,9 @@ export async function POST(
             where: { id: cryptoPaymentId },
             data: {
               transactionHash: txHash,
-              receivedAmount: receivedAmount.toString(),
-              confirmations
+              amount: receivedAmount.toString(), // Update with actual crypto amount received
+              confirmations,
+              fiatAmount: actualFiatAmount
             }
           });
 
