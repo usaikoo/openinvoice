@@ -6,6 +6,10 @@ import { getCryptoAddress } from '@/lib/crypto/address-management';
 import { calculateInvoiceTotals } from '@/lib/invoice-calculations';
 import { getInvoiceCurrency } from '@/lib/currency';
 import { isTestMode, isTestnetEnabled } from '@/lib/crypto/blockchain-monitor';
+import {
+  getTokenAccountAddress,
+  getMintAddress
+} from '@/lib/crypto/solana-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,15 +151,39 @@ export async function POST(request: NextRequest) {
     );
 
     // Get crypto address
-    const address = await getCryptoAddress(orgId, cryptocurrency);
+    // For Solana tokens (USDC, USDT, SOL), we need to derive the Associated Token Account (ATA)
+    const crypto = cryptocurrency.toLowerCase();
+    const isSolanaToken =
+      crypto === 'usdc' || crypto === 'usdt' || crypto === 'sol';
 
-    // Generate destination tag for XRP (unique identifier for this payment)
-    // XRP destination tags are 32-bit unsigned integers (0 to 4294967295)
-    // This allows multiple invoices to use the same address
-    const isXRP = cryptocurrency.toLowerCase() === 'xrp';
-    const destinationTag = isXRP
-      ? Math.floor(Math.random() * 2147483647) // Max safe XRP destination tag
-      : null;
+    let address: string;
+    let destinationTag: number | null = null;
+
+    let walletAddress: string | undefined;
+    if (isSolanaToken) {
+      // Get the wallet address
+      walletAddress = await getCryptoAddress(orgId, cryptocurrency);
+
+      if (crypto === 'sol') {
+        // For native SOL, use the wallet address directly (not token account)
+        address = walletAddress;
+      } else {
+        // For USDC/USDT, derive the token account address
+        const mintAddress = getMintAddress(cryptocurrency, isTestnetEnabled());
+        address = await getTokenAccountAddress(walletAddress, mintAddress);
+      }
+    } else {
+      // For other cryptos (XRP, etc.), use the address directly
+      address = await getCryptoAddress(orgId, cryptocurrency);
+
+      // Generate destination tag for XRP (unique identifier for this payment)
+      // XRP destination tags are 32-bit unsigned integers (0 to 4294967295)
+      // This allows multiple invoices to use the same address
+      const isXRP = crypto === 'xrp';
+      destinationTag = isXRP
+        ? Math.floor(Math.random() * 2147483647) // Max safe XRP destination tag
+        : null;
+    }
 
     // Set expiration (24 hours from now)
     const expiresAt = new Date();
@@ -206,11 +234,16 @@ export async function POST(request: NextRequest) {
 
     // Generate QR code data
     // For XRP, include destination tag in QR code
-    let qrCodeData = `${cryptocurrency.toLowerCase()}:${address}`;
-    if (isXRP && destinationTag !== null) {
-      qrCodeData += `?dt=${destinationTag}&amount=${cryptoAmount}`;
+    // For Solana, we can use Solana Pay format or simple address format
+    let qrCodeData: string;
+    if (isSolanaToken) {
+      // Use Solana Pay format: solana:<address>?amount=<amount>&spl-token=<mint>
+      const mintAddress = getMintAddress(cryptocurrency, isTestnetEnabled());
+      qrCodeData = `solana:${address}?amount=${cryptoAmount}&spl-token=${mintAddress}`;
+    } else if (crypto === 'xrp' && destinationTag !== null) {
+      qrCodeData = `${cryptocurrency.toLowerCase()}:${address}?dt=${destinationTag}&amount=${cryptoAmount}`;
     } else {
-      qrCodeData += `?amount=${cryptoAmount}`;
+      qrCodeData = `${cryptocurrency.toLowerCase()}:${address}?amount=${cryptoAmount}`;
     }
 
     return NextResponse.json({
@@ -219,6 +252,7 @@ export async function POST(request: NextRequest) {
       cryptocurrency: cryptocurrency.toUpperCase(),
       cryptoAmount,
       address,
+      walletAddress: walletAddress || undefined, // Include wallet address for native SOL monitoring
       destinationTag, // Include in response for display
       qrCode: qrCodeData,
       expiresAt: expiresAt.toISOString(),
