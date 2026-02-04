@@ -26,8 +26,13 @@ import {
 } from '@/components/ui/select';
 import {
   createXRPWebSocketMonitor,
-  isWebSocketAvailable
+  isWebSocketAvailable as isXRPWebSocketAvailable
 } from '@/lib/crypto/xrp-websocket';
+import {
+  createSolanaWebSocketMonitor,
+  isWebSocketAvailable as isSolanaWebSocketAvailable
+} from '@/lib/crypto/solana-websocket';
+import { getMintAddress } from '@/lib/crypto/solana-utils';
 
 interface CryptoPaymentFormProps {
   invoiceId: string;
@@ -35,7 +40,12 @@ interface CryptoPaymentFormProps {
   onSuccess?: () => void;
 }
 
-const SUPPORTED_CRYPTOS = [{ value: 'xrp', label: 'Ripple (XRP)' }];
+const SUPPORTED_CRYPTOS = [
+  { value: 'xrp', label: 'Ripple (XRP)' },
+  { value: 'usdc', label: 'USD Coin (USDC) - Solana' },
+  { value: 'usdt', label: 'Tether (USDT) - Solana' },
+  { value: 'sol', label: 'Solana (SOL)' }
+];
 
 interface CryptoPaymentData {
   paymentId: string;
@@ -84,10 +94,22 @@ export function CryptoPaymentForm({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const wsMonitorRef = useRef<ReturnType<
-    typeof createXRPWebSocketMonitor
+    typeof createXRPWebSocketMonitor | typeof createSolanaWebSocketMonitor
   > | null>(null);
   const wsSetupRef = useRef<string | null>(null); // Track which address we've set up WebSocket for
   const wsFailedRef = useRef<boolean>(false); // Track if WebSocket has failed (to prevent retries)
+
+  // Check if WebSocket is available (for XRP or Solana)
+  const isWebSocketAvailable = useCallback(() => {
+    return (
+      (typeof createXRPWebSocketMonitor !== 'undefined' &&
+        typeof isXRPWebSocketAvailable !== 'undefined' &&
+        isXRPWebSocketAvailable()) ||
+      (typeof createSolanaWebSocketMonitor !== 'undefined' &&
+        typeof isSolanaWebSocketAvailable !== 'undefined' &&
+        isSolanaWebSocketAvailable())
+    );
+  }, []);
 
   // Storage key for persisting payment data
   const storageKey = `crypto-payment-${invoiceId}`;
@@ -137,11 +159,6 @@ export function CryptoPaymentForm({
           })
         };
 
-        console.log('[CryptoPaymentForm] Calling check endpoint:', {
-          url: `/api/invoices/${invoiceId}/crypto-payment/check`,
-          body: requestBody
-        });
-
         // Use public endpoint for invoice-based checking (works for public view)
         const response = await fetch(
           `/api/invoices/${invoiceId}/crypto-payment/check`,
@@ -152,11 +169,6 @@ export function CryptoPaymentForm({
             },
             body: JSON.stringify(requestBody)
           }
-        );
-
-        console.log(
-          '[CryptoPaymentForm] Check endpoint response status:',
-          response.status
         );
 
         if (!response.ok) {
@@ -399,15 +411,16 @@ export function CryptoPaymentForm({
           const remaining = Math.max(0, fiveMinutes - elapsed);
 
           // Check if QR code is expired (5 minutes)
+          // Note: We hide the QR code but keep monitoring until DB expiration (24 hours)
           if (remaining <= 0) {
-            // Clear expired payment data
-            setPaymentData(null);
+            // Hide QR code but keep monitoring active
             setQrCodeDataUrl('');
-            setPaymentStatus(null);
-            setTimeRemaining(null);
-            localStorage.removeItem(storageKey);
-            localStorage.removeItem(sessionStorageKey);
-            toast.info('QR code has expired. Please create a new payment.');
+            setTimeRemaining(0);
+            // Don't clear paymentData - keep monitoring until DB expiration
+            // The WebSocket/polling will continue to check for payments
+            toast.info(
+              'QR code has expired, but payment monitoring continues. You can still complete the payment.'
+            );
             return;
           }
 
@@ -430,15 +443,41 @@ export function CryptoPaymentForm({
 
   // Use WebSocket for XRP, polling for other cryptos
   useEffect(() => {
-    if (!paymentData || paymentStatus?.confirmed) {
+    // Continue monitoring even if QR expired - only stop if payment confirmed or paymentData truly cleared
+    // We check localStorage to restore paymentData if QR expired but payment still valid
+    if (!paymentData) {
+      // Try to restore from localStorage if QR expired but payment still valid
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData) {
+        try {
+          const restored = JSON.parse(savedData);
+          // Check if payment hasn't expired on server (24 hours)
+          const expiresAt = new Date(restored.expiresAt);
+          if (expiresAt > new Date()) {
+            console.log(
+              '[Crypto Payment] Restoring payment data after QR expiration'
+            );
+            setPaymentData(restored);
+            return; // Will re-run with restored data
+          }
+        } catch (e) {
+          // Invalid data, continue without monitoring
+        }
+      }
+      return;
+    }
+
+    if (paymentStatus?.confirmed) {
       return;
     }
 
     const crypto = paymentData.cryptocurrency.toLowerCase();
     const addressKey = `${crypto}-${paymentData.address}`;
+    const isSolanaToken =
+      crypto === 'usdc' || crypto === 'usdt' || crypto === 'sol';
 
-    // Use WebSocket for XRP (real-time updates)
-    if (crypto === 'xrp' && isWebSocketAvailable()) {
+    // Use WebSocket for XRP and Solana tokens (real-time updates)
+    if ((crypto === 'xrp' || isSolanaToken) && isWebSocketAvailable()) {
       // If WebSocket already failed for this address, skip and use polling
       if (wsFailedRef.current && wsSetupRef.current === addressKey) {
         console.log(
@@ -478,75 +517,105 @@ export function CryptoPaymentForm({
       // Mark that we're setting up for this address
       wsSetupRef.current = addressKey;
 
-      // Create WebSocket monitor
-      // Use paymentData.testnet which comes from the server and reflects the actual environment
-      const monitor = createXRPWebSocketMonitor({
-        address: paymentData.address,
-        isTestnet: paymentData.testnet || false,
-        onTransaction: async (tx) => {
-          console.log('[XRP WebSocket] Transaction detected:', tx);
-
-          // Always use the ACTUAL amount received from WebSocket
-          const receivedAmount = parseFloat(tx.amount);
-
-          console.log('[XRP WebSocket] Calling checkPaymentStatus with:', {
-            cryptoPaymentId: paymentData.cryptoPaymentId,
-            actualCryptoAmount: receivedAmount.toString(),
-            transactionHash: tx.hash,
-            destinationTag: tx.destinationTag,
-            invoiceId
-          });
-
-          // Check payment status via API, passing the ACTUAL transaction data
-          // The API will update the payment with the actual amount received
-          try {
-            await checkPaymentStatus(paymentData, {
+      if (crypto === 'xrp') {
+        // Create XRP WebSocket monitor
+        const monitor = createXRPWebSocketMonitor({
+          address: paymentData.address,
+          isTestnet: paymentData.testnet || false,
+          onTransaction: async (tx) => {
+            console.log('[XRP WebSocket] Transaction detected:', tx);
+            const receivedAmount = parseFloat(tx.amount);
+            console.log('[XRP WebSocket] Calling checkPaymentStatus with:', {
+              cryptoPaymentId: paymentData.cryptoPaymentId,
               actualCryptoAmount: receivedAmount.toString(),
               transactionHash: tx.hash,
-              destinationTag: tx.destinationTag
+              destinationTag: tx.destinationTag,
+              invoiceId
             });
-            console.log('[XRP WebSocket] checkPaymentStatus completed');
-          } catch (error) {
-            console.error(
-              '[XRP WebSocket] Error in checkPaymentStatus:',
-              error
+            try {
+              await checkPaymentStatus(paymentData, {
+                actualCryptoAmount: receivedAmount.toString(),
+                transactionHash: tx.hash,
+                destinationTag: tx.destinationTag
+              });
+              console.log('[XRP WebSocket] checkPaymentStatus completed');
+            } catch (error) {
+              console.error(
+                '[XRP WebSocket] Error in checkPaymentStatus:',
+                error
+              );
+            }
+          },
+          onError: (error) => {
+            console.warn(
+              '[XRP WebSocket] Connection failed, falling back to polling:',
+              error.message
             );
+            wsFailedRef.current = true;
+            if (wsMonitorRef.current) {
+              wsMonitorRef.current.disconnect().catch(() => {});
+              wsMonitorRef.current = null;
+            }
+            if (!pollingIntervalRef.current) {
+              pollingIntervalRef.current = setInterval(async () => {
+                await checkPaymentStatus(paymentData);
+              }, 5000);
+            }
           }
-        },
-        onError: (error) => {
-          console.warn(
-            '[XRP WebSocket] Connection failed, falling back to polling:',
-            error.message
-          );
-          // Mark as failed to prevent retries
-          wsFailedRef.current = true;
-
-          // Immediately fallback to polling on WebSocket error
-          // Disconnect WebSocket to prevent further attempts
-          if (wsMonitorRef.current) {
-            wsMonitorRef.current.disconnect().catch(() => {
-              // Ignore disconnect errors
-            });
-            wsMonitorRef.current = null;
+        });
+        wsMonitorRef.current = monitor;
+        monitor.connect().catch((error) => {
+          console.log('[XRP WebSocket] Connection error:', error);
+        });
+      } else if (isSolanaToken) {
+        // Create Solana WebSocket monitor
+        const mintAddress = getMintAddress(
+          crypto,
+          paymentData.testnet || false
+        );
+        const isNativeSOL = crypto === 'sol';
+        const monitor = createSolanaWebSocketMonitor({
+          tokenAccountAddress: paymentData.address,
+          mintAddress: mintAddress,
+          walletAddress: (paymentData as any).walletAddress, // Wallet address for native SOL
+          isNativeSOL: isNativeSOL, // True for native SOL, false for USDC/USDT
+          isTestnet: paymentData.testnet || false,
+          onTransaction: async (tx) => {
+            const receivedAmount = parseFloat(tx.amount);
+            try {
+              await checkPaymentStatus(paymentData, {
+                actualCryptoAmount: receivedAmount.toString(),
+                transactionHash: tx.signature
+              });
+            } catch (error) {
+              console.error(
+                '[Solana WebSocket] Error in checkPaymentStatus:',
+                error
+              );
+            }
+          },
+          onError: (error) => {
+            console.warn(
+              '[Solana WebSocket] Connection failed, falling back to polling:',
+              error.message
+            );
+            wsFailedRef.current = true;
+            if (wsMonitorRef.current) {
+              wsMonitorRef.current.disconnect().catch(() => {});
+              wsMonitorRef.current = null;
+            }
+            if (!pollingIntervalRef.current) {
+              pollingIntervalRef.current = setInterval(async () => {
+                await checkPaymentStatus(paymentData);
+              }, 5000);
+            }
           }
-
-          // Start polling instead
-          if (!pollingIntervalRef.current) {
-            console.log('[XRP] Using polling instead of WebSocket');
-            pollingIntervalRef.current = setInterval(async () => {
-              await checkPaymentStatus(paymentData);
-            }, 5000);
-          }
-        }
-      });
-
-      wsMonitorRef.current = monitor;
-
-      // Connect asynchronously
-      monitor.connect().catch((error) => {
-        console.log('[XRP WebSocket] Connection error:', error);
-        // Error handler will be called by the monitor
-      });
+        });
+        wsMonitorRef.current = monitor;
+        monitor.connect().catch((error) => {
+          console.log('[Solana WebSocket] Connection error:', error);
+        });
+      }
 
       // Also do an initial check
       checkPaymentStatus(paymentData);
@@ -645,6 +714,12 @@ export function CryptoPaymentForm({
         return isTestnet
           ? `https://testnet.xrpl.org/transactions/${hash}`
           : `https://xrpscan.com/tx/${hash}`;
+      case 'usdc':
+      case 'usdt':
+      case 'sol':
+        return isTestnet
+          ? `https://explorer.solana.com/tx/${hash}?cluster=testnet`
+          : `https://explorer.solana.com/tx/${hash}`;
       default:
         return `https://blockchair.com/${crypto}/transaction/${hash}`;
     }
@@ -806,6 +881,34 @@ export function CryptoPaymentForm({
                         className='flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline'
                       >
                         Open Test XRP Payment Sender
+                        <ExternalLink className='h-3 w-3' />
+                      </a>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+            {(paymentData.testMode || paymentData.testnet) &&
+              (paymentData.cryptocurrency.toLowerCase() === 'usdc' ||
+                paymentData.cryptocurrency.toLowerCase() === 'usdt' ||
+                paymentData.cryptocurrency.toLowerCase() === 'sol') && (
+                <Alert className='border-blue-500 bg-blue-50 dark:bg-blue-950'>
+                  <AlertDescription className='text-blue-800 dark:text-blue-200'>
+                    <div className='space-y-2'>
+                      <p className='text-sm font-medium'>
+                        🧪 Test Solana Payment Tool
+                      </p>
+                      <p className='text-xs'>
+                        Use this tool to send test Solana payments (SOL, USDC,
+                        USDT) for testing purposes:
+                      </p>
+                      <a
+                        href='/test-send-solana'
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline'
+                      >
+                        Open Test Solana Payment Sender
                         <ExternalLink className='h-3 w-3' />
                       </a>
                     </div>

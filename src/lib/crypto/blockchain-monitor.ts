@@ -10,6 +10,12 @@
  */
 
 import { Client } from 'xrpl';
+import {
+  findMatchingTransaction,
+  getTransactionDetails as getSolanaTransactionDetails,
+  getTokenAccountAddress,
+  getMintAddress
+} from './solana-utils';
 
 // Configuration
 const CRYPTO_TEST_MODE = process.env.CRYPTO_TEST_MODE === 'true';
@@ -300,8 +306,8 @@ async function getXRPTransactions(
 
     // Use xrpl Client library (following tutorial approach)
     const serverUrl = isTestnet
-      ? 'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
-      : 'wss://xrplcluster.com'; // Mainnet cluster
+      ? process.env.XRP_TESTNET_WS_URL || 'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
+      : process.env.XRP_MAINNET_WS_URL || 'wss://xrplcluster.com'; // Mainnet cluster
 
     client = new Client(serverUrl);
     await client.connect();
@@ -422,8 +428,8 @@ export async function getXRPBlockHeight(
   try {
     // Use xrpl Client library (following tutorial approach)
     const serverUrl = isTestnet
-      ? 'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
-      : 'wss://xrplcluster.com'; // Mainnet cluster
+      ? process.env.XRP_TESTNET_WS_URL || 'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
+      : process.env.XRP_MAINNET_WS_URL || 'wss://xrplcluster.com'; // Mainnet cluster
 
     client = new Client(serverUrl);
     await client.connect();
@@ -528,6 +534,23 @@ export async function checkBlockchainTransactions(
         sinceTimestamp,
         isTestnet
       );
+    } else if (crypto === 'usdc' || crypto === 'usdt' || crypto === 'sol') {
+      // Solana tokens - address is the token account address (or wallet address for native SOL)
+      const tx = await findMatchingTransaction(
+        address,
+        minAmount,
+        sinceTimestamp,
+        isTestnet
+      );
+      if (tx) {
+        transactions.push({
+          hash: tx.signature,
+          amount: tx.amount,
+          confirmations: 1, // Solana transactions confirm quickly
+          timestamp: tx.timestamp,
+          from: tx.from
+        });
+      }
     } else {
       throw new Error(`Unsupported cryptocurrency: ${cryptocurrency}`);
     }
@@ -588,14 +611,30 @@ export async function getTransactionDetails(
 
   const crypto = cryptocurrency.toLowerCase();
 
+  if (crypto === 'usdc' || crypto === 'usdt' || crypto === 'sol') {
+    // Solana tokens
+    const tx = await getSolanaTransactionDetails(transactionHash, isTestnet);
+    if (tx) {
+      return {
+        hash: tx.signature,
+        amount: tx.amount,
+        confirmations: tx.confirmations,
+        timestamp: tx.timestamp,
+        from: tx.from
+      };
+    }
+    return null;
+  }
+
   if (crypto === 'xrp') {
     let client: Client | null = null;
 
     try {
       // Use xrpl Client library (following tutorial approach)
       const serverUrl = isTestnet
-        ? 'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
-        : 'wss://xrplcluster.com'; // Mainnet cluster
+        ? process.env.XRP_TESTNET_WS_URL ||
+          'wss://s.altnet.rippletest.net:51233' // Testnet WebSocket
+        : process.env.XRP_MAINNET_WS_URL || 'wss://xrplcluster.com'; // Mainnet cluster
 
       client = new Client(serverUrl);
       await client.connect();
@@ -706,6 +745,12 @@ export function getExplorerUrl(
       return isTestnet
         ? `https://testnet.xrpl.org/transactions/${transactionHash}`
         : `https://xrpscan.com/tx/${transactionHash}`;
+    case 'usdc':
+    case 'usdt':
+    case 'sol':
+      return isTestnet
+        ? `https://explorer.solana.com/tx/${transactionHash}?cluster=testnet`
+        : `https://explorer.solana.com/tx/${transactionHash}`;
     default:
       return `https://blockchair.com/${crypto}/transaction/${transactionHash}`;
   }

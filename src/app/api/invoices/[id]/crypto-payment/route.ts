@@ -79,12 +79,32 @@ export async function GET(
         qrCodeData += `?amount=${cryptoPayment.amount}`;
       }
 
+      // For native SOL, we need to get the wallet address from the organization
+      // The address stored might be a token account, but for native SOL we need wallet address
+      let walletAddress: string | undefined;
+      const isNativeSOL =
+        cryptoPayment.cryptocurrencyCode.toLowerCase() === 'sol';
+      if (isNativeSOL && cryptoPayment.walletId) {
+        // Try to get wallet address from CryptoAddressUsage if available
+        const walletUsage = await prisma.cryptoAddressUsage.findUnique({
+          where: { id: cryptoPayment.walletId }
+        });
+        if (walletUsage) {
+          walletAddress = walletUsage.address;
+        }
+      }
+      // If no wallet address found, use the stored address (might be wallet address for native SOL)
+      if (!walletAddress && isNativeSOL) {
+        walletAddress = cryptoPayment.address;
+      }
+
       return NextResponse.json({
         paymentId: cryptoPayment.paymentId,
         cryptoPaymentId: cryptoPayment.id,
         cryptocurrency: cryptoPayment.cryptocurrencyCode.toUpperCase(),
         cryptoAmount: cryptoPayment.amount.toString(),
         address: cryptoPayment.address,
+        walletAddress: walletAddress, // Include wallet address for native SOL monitoring
         destinationTag: cryptoPayment.destinationTag, // Include destination tag
         qrCode: qrCodeData,
         expiresAt: cryptoPayment.expiresAt.toISOString(),

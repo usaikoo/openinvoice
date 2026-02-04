@@ -41,7 +41,8 @@ export async function createXRPAccount(
 
   try {
     // Use xrpl Client library (following tutorial approach)
-    const serverUrl = 'wss://s.altnet.rippletest.net:51233'; // Testnet WebSocket
+    const serverUrl =
+      process.env.XRP_TESTNET_WS_URL || 'wss://s.altnet.rippletest.net:51233'; // Testnet WebSocket
 
     client = new Client(serverUrl);
     await client.connect();
@@ -130,8 +131,8 @@ export async function getXRPBalance(
 
   try {
     const serverUrl = useTestnet
-      ? 'wss://s.altnet.rippletest.net:51233'
-      : 'wss://xrplcluster.com';
+      ? process.env.XRP_TESTNET_WS_URL || 'wss://s.altnet.rippletest.net:51233'
+      : process.env.XRP_MAINNET_WS_URL || 'wss://xrplcluster.com';
 
     client = new Client(serverUrl);
     await client.connect();

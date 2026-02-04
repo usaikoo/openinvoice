@@ -156,11 +156,11 @@ function getCryptoDecimals(cryptocurrency: string): number {
   const decimalsMap: Record<string, number> = {
     btc: 8,
     eth: 18,
-    usdt: 6,
-    usdc: 6,
+    usdt: 6, // USDT on Solana uses 6 decimals
+    usdc: 6, // USDC on Solana uses 6 decimals
     busd: 18,
     bnb: 18,
-    sol: 9,
+    sol: 9, // SOL uses 9 decimals
     xrp: 6,
     doge: 8,
     ltc: 8,

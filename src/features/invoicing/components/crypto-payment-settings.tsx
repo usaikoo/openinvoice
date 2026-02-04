@@ -41,19 +41,33 @@ const cryptoSettingsSchema = z.object({
   cryptoMinConfirmations: z.number().min(1).max(100),
   stopReusingAddresses: z.boolean(),
   addressReuseCooldownHours: z.number().min(1).max(168),
-  xrpAddresses: z.array(z.string())
+  xrpAddresses: z.array(z.string()),
+  usdcAddresses: z.array(z.string()),
+  usdtAddresses: z.array(z.string()),
+  solAddresses: z.array(z.string())
 });
 
 type CryptoSettingsFormData = z.infer<typeof cryptoSettingsSchema>;
 
-const SUPPORTED_CRYPTOS = [{ value: 'xrp', label: 'Ripple (XRP)' }];
+const SUPPORTED_CRYPTOS = [
+  { value: 'xrp', label: 'Ripple (XRP)' },
+  { value: 'usdc', label: 'USD Coin (USDC) - Solana' },
+  { value: 'usdt', label: 'Tether (USDT) - Solana' },
+  { value: 'sol', label: 'Solana (SOL)' }
+];
 
 export function CryptoPaymentSettings() {
   const queryClient = useQueryClient();
   const [newAddresses, setNewAddresses] = useState<{
     xrp: string;
+    usdc: string;
+    usdt: string;
+    sol: string;
   }>({
-    xrp: ''
+    xrp: '',
+    usdc: '',
+    usdt: '',
+    sol: ''
   });
 
   // Fetch current crypto settings
@@ -98,7 +112,10 @@ export function CryptoPaymentSettings() {
       cryptoMinConfirmations: 3,
       stopReusingAddresses: false,
       addressReuseCooldownHours: 24,
-      xrpAddresses: []
+      xrpAddresses: [],
+      usdcAddresses: [],
+      usdtAddresses: [],
+      solAddresses: []
     }
   });
 
@@ -114,7 +131,10 @@ export function CryptoPaymentSettings() {
         cryptoMinConfirmations: settings.cryptoMinConfirmations || 3,
         stopReusingAddresses: settings.stopReusingAddresses || false,
         addressReuseCooldownHours: settings.addressReuseCooldownHours || 24,
-        xrpAddresses: wallets.xrp || []
+        xrpAddresses: wallets.xrp || [],
+        usdcAddresses: wallets.usdc || [],
+        usdtAddresses: wallets.usdt || [],
+        solAddresses: wallets.sol || []
       });
     }
   }, [settings, form]);
@@ -123,11 +143,19 @@ export function CryptoPaymentSettings() {
     updateSettings.mutate(data);
   };
 
-  const addAddress = (crypto: 'xrp') => {
+  const addAddress = (crypto: 'xrp' | 'usdc' | 'usdt' | 'sol') => {
     const address = newAddresses[crypto].trim();
     if (!address) {
       toast.error('Please enter an address');
       return;
+    }
+
+    // Basic validation for Solana addresses (base58, 32-44 chars)
+    if (['usdc', 'usdt', 'sol'].includes(crypto)) {
+      if (address.length < 32 || address.length > 44) {
+        toast.error('Invalid Solana address format');
+        return;
+      }
     }
 
     const currentAddresses = form.getValues(`${crypto}Addresses` as any) || [];
@@ -140,7 +168,10 @@ export function CryptoPaymentSettings() {
     setNewAddresses({ ...newAddresses, [crypto]: '' });
   };
 
-  const removeAddress = (crypto: 'xrp', index: number) => {
+  const removeAddress = (
+    crypto: 'xrp' | 'usdc' | 'usdt' | 'sol',
+    index: number
+  ) => {
     const currentAddresses = form.getValues(`${crypto}Addresses` as any) || [];
     form.setValue(
       `${crypto}Addresses` as any,
@@ -148,43 +179,64 @@ export function CryptoPaymentSettings() {
     );
   };
 
-  // Generate XRP account
+  // Generate crypto account (XRP or Solana)
   const generateAccount = useMutation({
-    mutationFn: async (useFaucet: boolean) => {
+    mutationFn: async ({
+      useFaucet,
+      cryptocurrency
+    }: {
+      useFaucet: boolean;
+      cryptocurrency: string;
+    }) => {
       const response = await fetch('/api/organizations/crypto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ useFaucet })
+        body: JSON.stringify({ useFaucet, cryptocurrency })
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to generate XRP account');
+        throw new Error(
+          error.error || `Failed to generate ${cryptocurrency} account`
+        );
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['crypto-settings'] });
 
+      const crypto = variables.cryptocurrency.toLowerCase();
+      const cryptoKey = crypto as 'xrp' | 'usdc' | 'usdt' | 'sol';
+
       // Add the generated address to the form
-      const currentAddresses = form.getValues('xrpAddresses') || [];
-      form.setValue('xrpAddresses', [
+      const currentAddresses =
+        form.getValues(`${cryptoKey}Addresses` as any) || [];
+      form.setValue(`${cryptoKey}Addresses` as any, [
         ...currentAddresses,
         data.account.address
       ]);
 
-      // Show success message with seed info
+      // Show success message with key info
+      const cryptoLabel = crypto.toUpperCase();
+      const keyInfo = data.account.seed
+        ? `Seed: ${data.account.seed}`
+        : data.account.privateKey
+          ? `Private Key: ${data.account.privateKey.substring(0, 20)}...`
+          : '';
+
       toast.success(
-        `XRP account generated! Address: ${data.account.address.substring(0, 10)}...`,
+        `${cryptoLabel} account generated! Address: ${data.account.address.substring(0, 10)}...`,
         {
-          description: data.account.seed
-            ? `Seed: ${data.account.seed} - Save this securely!`
-            : 'Account generated successfully',
+          description:
+            keyInfo +
+            (keyInfo
+              ? ' - Save this securely!'
+              : 'Account generated successfully'),
           duration: 10000
         }
       );
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to generate XRP account');
+      toast.error(error.message || 'Failed to generate account');
     }
   });
 
@@ -326,11 +378,21 @@ export function CryptoPaymentSettings() {
                     Add wallet addresses for each cryptocurrency you want to
                     accept. The system will rotate through these addresses for
                     each payment.
+                    <br />
+                    <br />
+                    <strong>Solana addresses:</strong> For USDC, USDT, and SOL,
+                    enter your Solana wallet address (base58 format, 32-44
+                    characters). The system will automatically derive the
+                    Associated Token Account (ATA) for token payments.
                   </AlertDescription>
                 </Alert>
 
                 {SUPPORTED_CRYPTOS.map((crypto) => {
-                  const cryptoKey = crypto.value as 'xrp';
+                  const cryptoKey = crypto.value as
+                    | 'xrp'
+                    | 'usdc'
+                    | 'usdt'
+                    | 'sol';
                   const addresses =
                     form.watch(`${cryptoKey}Addresses` as any) || [];
                   const isTestnet = isTestnetEnabled();
@@ -339,10 +401,16 @@ export function CryptoPaymentSettings() {
                     <div key={crypto.value} className='space-y-2'>
                       <div className='flex items-center justify-between'>
                         <Label>{crypto.label} Addresses</Label>
-                        {cryptoKey === 'xrp' && (
+                        {(cryptoKey === 'xrp' ||
+                          ['usdc', 'usdt', 'sol'].includes(cryptoKey)) && (
                           <Button
                             type='button'
-                            onClick={() => generateAccount.mutate(isTestnet)}
+                            onClick={() =>
+                              generateAccount.mutate({
+                                useFaucet: isTestnet,
+                                cryptocurrency: cryptoKey
+                              })
+                            }
                             disabled={generateAccount.isPending}
                             variant='outline'
                             size='sm'
@@ -357,8 +425,8 @@ export function CryptoPaymentSettings() {
                               <>
                                 <Sparkles className='h-3 w-3' />
                                 {isTestnet
-                                  ? 'Generate Testnet Account'
-                                  : 'Generate Account'}
+                                  ? `Generate Testnet ${cryptoKey.toUpperCase()} Account`
+                                  : `Generate ${cryptoKey.toUpperCase()} Account`}
                               </>
                             )}
                           </Button>

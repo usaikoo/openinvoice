@@ -63,8 +63,8 @@ class XRPWebSocketMonitor {
 
     // Use official XRP Ledger endpoints
     const serverUrl = this.config.isTestnet
-      ? 'wss://s.altnet.rippletest.net:51233' // Official testnet WebSocket
-      : 'wss://xrplcluster.com'; // Mainnet cluster
+      ? process.env.XRP_TESTNET_WS_URL || 'wss://s.altnet.rippletest.net:51233' // Official testnet WebSocket
+      : process.env.XRP_MAINNET_WS_URL || 'wss://xrplcluster.com'; // Mainnet cluster
 
     console.log(`[XRP WebSocket] Connecting to ${serverUrl}...`);
 
